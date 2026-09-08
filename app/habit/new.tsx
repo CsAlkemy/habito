@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { AccentTile } from '@/components/AccentTile';
+import { ColorSwatches } from '@/components/ColorSwatches';
+import { MilestonePicker } from '@/components/MilestonePicker';
 import { NavHeader } from '@/components/NavHeader';
 import { Screen } from '@/components/Screen';
 import { TimeField } from '@/components/TimeField';
@@ -9,27 +10,27 @@ import { useStore } from '@/data/store';
 import type { MilestoneKind, Schedule } from '@/data/types';
 import { scheduleLabel } from '@/lib/date';
 import { themedStyles, useTheme } from '@/theme';
-import { ACCENT_FOLLOW, ACCENT_OPTIONS, font, GUTTER, radius, resolveHabitColor } from '@/theme/tokens';
-
-const KINDS: { id: MilestoneKind; title: string; sub: string }[] = [
-  {
-    id: 'count',
-    title: 'A number I hit each day',
-    sub: '8 glasses, 30 minutes, 10,000 steps',
-  },
-  {
-    id: 'streak',
-    title: 'Days in a row, toward a milestone',
-    sub: 'Reach day 7, then 21, then 30',
-  },
-  {
-    id: 'custom',
-    title: 'My own words',
-    sub: "You write what today's win looks like",
-  },
-];
+import { ACCENT_FOLLOW, font, GUTTER, radius } from '@/theme/tokens';
 
 const SCHEDULES: Schedule[] = ['daily', 'weekdays', 'some'];
+
+/** Keep count habits from scheduling an absurd pile of notifications. */
+const MAX_REMINDERS = 8;
+
+const toHHMM = (minutes: number) =>
+  `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+/**
+ * Suggested reminder times for "N times a day": up to six, spread evenly
+ * between 08:00 and 20:00 and kept on 15-minute marks.
+ */
+function prefillTimes(targetText: string): string[] {
+  const n = Math.min(Math.max(Number.parseInt(targetText, 10) || 1, 1), 6);
+  if (n === 1) return ['08:00'];
+  return Array.from({ length: n }, (_, i) =>
+    toHHMM(Math.round((8 * 60 + (i * 12 * 60) / (n - 1)) / 15) * 15),
+  );
+}
 
 /**
  * Screen 2e — new habit, and the edit form behind the habit detail's "Edit".
@@ -51,16 +52,14 @@ export default function NewHabit() {
   const [goal, setGoal] = useState(existing?.goal ?? '');
   const [target, setTarget] = useState(String(existing?.target ?? 8));
   const [schedule, setSchedule] = useState<Schedule>(existing?.schedule ?? 'daily');
-  const [reminder, setReminder] = useState(existing?.reminder ?? '08:00');
+  const [reminders, setReminders] = useState<string[]>(() =>
+    existing ? (existing.reminder?.split(',').filter(Boolean) ?? []) : ['08:00'],
+  );
   const [color, setColor] = useState(existing?.color ?? ACCENT_FOLLOW);
 
-  // First choice follows the app accent (stored as a sentinel, so re-theming
-  // re-tints the habit); the rest are literal hexes that stay put.
-  const swatches = [
-    ACCENT_FOLLOW,
-    ...ACCENT_OPTIONS.filter((option) => option !== colors.accent),
-    '#9A9AA2',
-  ];
+  // Once the user has touched the reminder list (or is editing a saved habit),
+  // changing the kind or target stops re-prefilling it over their choices.
+  const remindersTouched = useRef(Boolean(existing));
 
   const trimmed = name.trim();
   const canSave = trimmed.length > 0;
@@ -69,16 +68,42 @@ export default function NewHabit() {
   const cycle = <T,>(list: T[], current: T, set: (next: T) => void) =>
     set(list[(list.indexOf(current) + 1) % list.length]);
 
-  const fields = () => ({
-    name: trimmed,
-    color,
-    schedule,
-    reminder: reminder || undefined,
-    ...(kind === 'count'
-      ? { target: Math.max(1, Number.parseInt(target, 10) || 1), unit: 'times' }
-      : {}),
-    ...(kind === 'custom' ? { goal: goal.trim() } : {}),
-  });
+  const editReminders = (next: string[]) => {
+    remindersTouched.current = true;
+    setReminders(next);
+  };
+
+  const addReminder = () => {
+    const last = /^(\d{1,2}):(\d{2})$/.exec(reminders[reminders.length - 1] ?? '');
+    const next = last ? toHHMM(((Number(last[1]) + 1) % 24) * 60 + Number(last[2])) : '08:00';
+    editReminders([...reminders, next]);
+  };
+
+  const changeKind = (next: MilestoneKind) => {
+    setKind(next);
+    if (!remindersTouched.current) setReminders(next === 'count' ? prefillTimes(target) : ['08:00']);
+  };
+
+  const changeTarget = (next: string) => {
+    setTarget(next);
+    if (kind === 'count' && !remindersTouched.current) setReminders(prefillTimes(next));
+  };
+
+  const fields = () => {
+    const times = [
+      ...new Set((kind === 'count' ? reminders : reminders.slice(0, 1)).filter((t) => t.trim())),
+    ].sort();
+    return {
+      name: trimmed,
+      color,
+      schedule,
+      reminder: times.join(',') || undefined,
+      ...(kind === 'count'
+        ? { target: Math.max(1, Number.parseInt(target, 10) || 1), unit: 'times' }
+        : {}),
+      ...(kind === 'custom' ? { goal: goal.trim() } : {}),
+    };
+  };
 
   const onSave = () => {
     if (!canSave) return;
@@ -136,68 +161,16 @@ export default function NewHabit() {
 
         <Text style={[text.label, styles.groupLabel]}>What counts as today&rsquo;s milestone</Text>
 
-        <View style={styles.kinds}>
-          {KINDS.map((option) => {
-            const selected = option.id === kind;
-            const body = (
-              <View style={styles.kindInner}>
-                <View style={styles.kindHeading}>
-                  <Text style={[text.cardTitle, selected && { color: colors.accentInk }]}>
-                    {option.title}
-                  </Text>
-                  {selected && <View style={styles.kindDot} />}
-                </View>
-                <Text
-                  style={[
-                    text.cardSub,
-                    styles.kindSub,
-                    selected && { color: colors.accentInkMuted },
-                  ]}
-                >
-                  {option.sub}
-                </Text>
-
-                {selected && option.id === 'custom' && (
-                  <TextInput
-                    value={goal}
-                    onChangeText={setGoal}
-                    placeholder="What does today's win look like?"
-                    placeholderTextColor={colors.accentInkMuted}
-                    style={styles.inlineField}
-                  />
-                )}
-                {selected && option.id === 'count' && (
-                  <View style={styles.inlineRow}>
-                    <TextInput
-                      value={target}
-                      onChangeText={setTarget}
-                      keyboardType="number-pad"
-                      style={[styles.inlineField, styles.inlineNumber]}
-                    />
-                    <Text style={styles.inlineUnit}>times a day</Text>
-                  </View>
-                )}
-              </View>
-            );
-
-            return (
-              <Pressable
-                key={option.id}
-                accessibilityRole="radio"
-                accessibilityState={{ selected, disabled: isEdit }}
-                disabled={isEdit}
-                onPress={() => setKind(option.id)}
-                style={({ pressed }) => pressed && styles.pressed}
-              >
-                {selected ? (
-                  <AccentTile r={radius.card}>{body}</AccentTile>
-                ) : (
-                  <View style={styles.kindPlain}>{body}</View>
-                )}
-              </Pressable>
-            );
-          })}
-        </View>
+        <MilestonePicker
+          kind={kind}
+          onKindChange={changeKind}
+          goal={goal}
+          onGoalChange={setGoal}
+          target={target}
+          onTargetChange={changeTarget}
+          locked={isEdit}
+          style={styles.kinds}
+        />
 
         <View style={styles.settings}>
           <Pressable
@@ -213,52 +186,83 @@ export default function NewHabit() {
             <Text style={styles.settingLabel}>Days</Text>
             <Text style={styles.settingValue}>{scheduleLabel(schedule)}</Text>
           </Pressable>
-          <View style={[styles.settingRow, styles.settingDivider]}>
-            <Text style={styles.settingLabel}>Remind me</Text>
-            <View style={styles.settingControls}>
-              {reminder.length > 0 && (
+          {kind === 'count' ? (
+            <View style={[styles.reminderBlock, styles.settingDivider]}>
+              <View style={styles.reminderHeader}>
+                <Text style={styles.settingLabel}>Remind me</Text>
+                {reminders.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Turn all reminders off"
+                    onPress={() => editReminders([])}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
+                    <Text style={styles.settingClear}>Off</Text>
+                  </Pressable>
+                )}
+              </View>
+              {reminders.map((time, index) => (
+                <View key={index} style={styles.reminderRow}>
+                  <TimeField
+                    value={time}
+                    onChange={(next) =>
+                      editReminders(reminders.map((t, i) => (i === index ? next : t)))
+                    }
+                    textStyle={styles.settingValue}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove the ${time} reminder`}
+                    hitSlop={10}
+                    onPress={() => editReminders(reminders.filter((_, i) => i !== index))}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
+                    <Text style={styles.reminderRemove}>✕</Text>
+                  </Pressable>
+                </View>
+              ))}
+              {reminders.length === 0 && (
+                <Text style={[styles.settingValue, styles.reminderEmpty]}>
+                  No reminders for this habit.
+                </Text>
+              )}
+              {reminders.length < MAX_REMINDERS && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Turn reminder off"
-                  onPress={() => setReminder('')}
-                  style={({ pressed }) => pressed && styles.pressed}
+                  accessibilityLabel="Add a reminder time"
+                  onPress={addReminder}
+                  style={({ pressed }) => [styles.reminderAdd, pressed && styles.pressed]}
                 >
-                  <Text style={styles.settingClear}>Off</Text>
+                  <Text style={styles.reminderAddLabel}>+ Add a time</Text>
                 </Pressable>
               )}
-              <TimeField
-                value={reminder}
-                onChange={setReminder}
-                placeholder="Off"
-                textStyle={styles.settingValue}
-              />
             </View>
-          </View>
+          ) : (
+            <View style={[styles.settingRow, styles.settingDivider]}>
+              <Text style={styles.settingLabel}>Remind me</Text>
+              <View style={styles.settingControls}>
+                {(reminders[0] ?? '').length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Turn reminder off"
+                    onPress={() => editReminders([])}
+                    style={({ pressed }) => pressed && styles.pressed}
+                  >
+                    <Text style={styles.settingClear}>Off</Text>
+                  </Pressable>
+                )}
+                <TimeField
+                  value={reminders[0] ?? ''}
+                  onChange={(next) => editReminders([next])}
+                  placeholder="Off"
+                  textStyle={styles.settingValue}
+                />
+              </View>
+            </View>
+          )}
           <View style={[styles.settingRow, styles.settingRowTight]}>
             <Text style={styles.settingLabel}>Colour</Text>
-            <View style={styles.swatches}>
-              {swatches.map((swatch) => {
-                const selected = swatch === color;
-                const shown = resolveHabitColor(swatch, colors.accent);
-                return (
-                  <Pressable
-                    key={swatch}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={
-                      swatch === ACCENT_FOLLOW ? 'Colour: match the app accent' : `Colour ${swatch}`
-                    }
-                    onPress={() => setColor(swatch)}
-                    style={[
-                      styles.swatchRing,
-                      selected && { borderColor: shown, borderWidth: 1.5 },
-                    ]}
-                  >
-                    <View style={[styles.swatch, { backgroundColor: shown }]} />
-                  </Pressable>
-                );
-              })}
-            </View>
+            <ColorSwatches value={color} onChange={setColor} />
           </View>
           {isEdit && existing && (
             <View style={[styles.settingRow, styles.orderRow]}>
@@ -343,56 +347,6 @@ const useStyles = themedStyles(({ colors }) => ({
   },
   kinds: {
     marginTop: 10,
-    gap: 8,
-  },
-  kindPlain: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.card,
-  },
-  kindInner: {
-    paddingVertical: 15,
-    paddingHorizontal: 16,
-  },
-  kindHeading: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    gap: 10,
-  },
-  kindDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
-    backgroundColor: colors.ground,
-  },
-  kindSub: {
-    marginTop: 3,
-  },
-  inlineField: {
-    marginTop: 12,
-    backgroundColor: 'rgba(10, 30, 36, 0.22)',
-    borderRadius: radius.sm,
-    paddingVertical: 12,
-    paddingHorizontal: 13,
-    fontFamily: font.medium,
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.accentInk,
-  },
-  inlineRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 10,
-  },
-  inlineNumber: {
-    width: 74,
-    textAlign: 'center' as const,
-  },
-  inlineUnit: {
-    marginTop: 12,
-    fontFamily: font.medium,
-    fontSize: 14,
-    color: colors.accentInk,
   },
   pressed: {
     opacity: 0.85,
@@ -440,20 +394,40 @@ const useStyles = themedStyles(({ colors }) => ({
     lineHeight: 17,
     color: colors.textDim,
   },
-  swatches: {
+  reminderBlock: {
+    paddingTop: 15,
+    paddingBottom: 13,
+    paddingHorizontal: 16,
+  },
+  reminderHeader: {
     flexDirection: 'row' as const,
-    gap: 7,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
   },
-  swatchRing: {
-    padding: 2,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+  reminderRow: {
+    marginTop: 12,
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
   },
-  swatch: {
-    width: 20,
-    height: 20,
-    borderRadius: 999,
+  reminderRemove: {
+    fontFamily: font.medium,
+    fontSize: 14,
+    lineHeight: 17,
+    color: colors.textDim,
+  },
+  reminderEmpty: {
+    marginTop: 12,
+  },
+  reminderAdd: {
+    marginTop: 14,
+    alignSelf: 'flex-start' as const,
+  },
+  reminderAddLabel: {
+    fontFamily: font.semibold,
+    fontSize: 14,
+    lineHeight: 17,
+    color: colors.accent,
   },
   orderRow: {
     paddingVertical: 11,

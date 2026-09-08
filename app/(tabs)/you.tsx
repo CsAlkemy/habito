@@ -120,7 +120,15 @@ export default function You() {
       'Every habit and check-in is deleted from this device. There is no cloud copy, so this cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Erase', style: 'destructive', onPress: eraseAll },
+        {
+          text: 'Erase',
+          style: 'destructive',
+          onPress: () => {
+            eraseAll();
+            // Wiped state means not onboarded, so drop the tab stack and start over.
+            router.replace('/onboarding');
+          },
+        },
       ],
     );
 

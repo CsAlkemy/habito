@@ -6,6 +6,11 @@ function doneClock(entry: Entry): string {
   return entry.doneAt ? clockTime(new Date(entry.doneAt)) : '—';
 }
 
+/** "08:00,12:30" (stored) -> "08:00, 12:30" (shown). */
+export function reminderLabel(reminder: string): string {
+  return reminder.split(',').filter(Boolean).join(', ');
+}
+
 /** "30 min" / "8 glasses" */
 export function targetLabel(habit: Habit): string {
   if (habit.kind !== 'count' || habit.target === undefined) return '';
@@ -32,7 +37,7 @@ export function habitSubtitle(habit: Habit, entry: Entry): string {
     }
     if (habit.unit === 'minutes') {
       return habit.reminder
-        ? `${habit.target} min · reminder at ${habit.reminder}`
+        ? `${habit.target} min · reminder at ${reminderLabel(habit.reminder)}`
         : `${habit.target} min`;
     }
     return `${entry.value} of ${habit.target} ${habit.unit}`;
@@ -49,7 +54,7 @@ export function habitDetailLine(habit: Habit): string {
   }
   if (habit.kind === 'custom' && habit.goal) parts.push(habit.goal);
   parts.push(scheduleLabel(habit.schedule).toLowerCase());
-  if (habit.reminder) parts.push(habit.reminder);
+  if (habit.reminder) parts.push(reminderLabel(habit.reminder));
   return parts.join(' · ');
 }
 

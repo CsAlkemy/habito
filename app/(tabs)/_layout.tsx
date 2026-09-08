@@ -1,12 +1,12 @@
 import { BlurView } from 'expo-blur';
+import { useRouter } from 'expo-router';
 import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AccentTile } from '@/components/AccentTile';
 import { ProgressIcon, TodayIcon, YouIcon } from '@/components/Icons';
 import { themedStyles, useTheme } from '@/theme';
 import { alpha } from '@/theme/color';
-import { GUTTER, radius } from '@/theme/tokens';
+import { font, GUTTER, radius } from '@/theme/tokens';
 
 const ICONS = {
   index: TodayIcon,
@@ -27,86 +27,93 @@ function isTabName(name: string): name is TabName {
 }
 
 /**
- * The tab bar floats as a glass capsule in the spirit of Apple's Liquid Glass:
- * a blurred, translucent material with a bright rim and a hairline top
- * highlight, the active tab filled by the accent gradient. Android's BlurView
- * needs a BlurTargetView wrapping the whole scene, so it gets a near-opaque
- * translucent fallback instead of a real blur.
+ * One piece of glass: blur (where available), a translucent wash, a bright rim
+ * and a top hairline highlight, clipped to a capsule. Android's BlurView needs
+ * a BlurTargetView wrapping the whole scene, so it gets a near-opaque wash.
+ */
+function Glass({ children, style }: { children: React.ReactNode; style?: object }) {
+  const { dark } = useTheme();
+  const styles = useStyles();
+  return (
+    <View style={[styles.glass, style]}>
+      {Platform.OS !== 'android' && (
+        <BlurView
+          intensity={dark ? 40 : 55}
+          tint={dark ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <View pointerEvents="none" style={styles.wash} />
+      {children}
+    </View>
+  );
+}
+
+/**
+ * Liquid-glass navigation: a floating capsule of tabs — each an icon over its
+ * label — where the active tab sits in a lighter glass pill, plus a detached
+ * round glass button for the app's one primary action, adding a habit.
  */
 function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const { colors, dark } = useTheme();
+  const router = useRouter();
+  const { colors } = useTheme();
   const styles = useStyles();
-
-  const row = (
-    <View style={styles.row}>
-      {state.routes.map((route, index) => {
-        if (!isTabName(route.name)) return null;
-
-        const focused = state.index === index;
-        const Icon = ICONS[route.name];
-
-        // The active tab is a chip that says its name; the others sit back as
-        // quiet icons, so the bar reads at a glance without three labels.
-        const body = focused ? (
-          <View style={styles.tabActive}>
-            <Icon color={colors.accentInk} />
-            <Text style={[styles.tabLabel, { color: colors.accentInk }]}>
-              {LABELS[route.name]}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.tabIdle}>
-            <Icon color={colors.textDim} size={21} />
-          </View>
-        );
-
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!focused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
-
-        return (
-          <Pressable
-            key={route.key}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={LABELS[route.name]}
-            onPress={onPress}
-            style={styles.tab}
-          >
-            {focused ? (
-              <AccentTile r={radius.full} flat>
-                {body}
-              </AccentTile>
-            ) : (
-              body
-            )}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
 
   return (
     <View style={[styles.shell, { marginBottom: Math.max(insets.bottom, 16) }]}>
-      <View style={styles.clip}>
-        {Platform.OS !== 'android' && (
-          <BlurView
-            intensity={dark ? 40 : 55}
-            tint={dark ? 'dark' : 'light'}
-            style={StyleSheet.absoluteFill}
-          />
-        )}
-        <View pointerEvents="none" style={styles.wash} />
-        <View pointerEvents="none" style={styles.topHighlight} />
-        {row}
+      <View style={[styles.shadow, styles.flex]}>
+        <Glass style={styles.flex}>
+          <View style={styles.row}>
+            {state.routes.map((route, index) => {
+              if (!isTabName(route.name)) return null;
+
+              const focused = state.index === index;
+              const Icon = ICONS[route.name];
+              const tint = focused ? colors.text : colors.textDim;
+
+              const onPress = () => {
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: route.key,
+                  canPreventDefault: true,
+                });
+                if (!focused && !event.defaultPrevented) {
+                  navigation.navigate(route.name);
+                }
+              };
+
+              return (
+                <Pressable
+                  key={route.key}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: focused }}
+                  accessibilityLabel={LABELS[route.name]}
+                  onPress={onPress}
+                  style={styles.tab}
+                >
+                  <View style={[styles.tabInner, focused && styles.tabPill]}>
+                    <Icon color={tint} size={23} />
+                    <Text style={[styles.tabLabel, { color: tint }]}>{LABELS[route.name]}</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Glass>
+      </View>
+
+      <View style={styles.shadow}>
+        <Glass>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add a habit"
+            onPress={() => router.push('/habit/new')}
+            style={({ pressed }) => [styles.plus, pressed && styles.pressed]}
+          >
+            <Text style={styles.plusGlyph}>+</Text>
+          </Pressable>
+        </Glass>
       </View>
     </View>
   );
@@ -129,14 +136,24 @@ export default function TabsLayout() {
   );
 }
 
-const useStyles = themedStyles(({ colors, dark, chromeShadow, text }) => ({
+const BAR_HEIGHT = 64;
+
+const useStyles = themedStyles(({ colors, dark, chromeShadow }) => ({
   shell: {
     marginTop: 12,
     marginHorizontal: GUTTER,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+  },
+  flex: {
+    flex: 1,
+  },
+  shadow: {
     borderRadius: radius.full,
     ...chromeShadow,
   },
-  clip: {
+  glass: {
     borderRadius: radius.full,
     overflow: 'hidden' as const,
     borderWidth: StyleSheet.hairlineWidth,
@@ -155,39 +172,46 @@ const useStyles = themedStyles(({ colors, dark, chromeShadow, text }) => ({
         ? alpha(colors.elevated, dark ? 0.94 : 0.92)
         : alpha(colors.elevated, dark ? 0.55 : 0.45),
   },
-  topHighlight: {
-    position: 'absolute' as const,
-    top: 0,
-    left: 12,
-    right: 12,
-    height: 1,
-    backgroundColor: dark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.95)',
-  },
   row: {
-    padding: 7,
+    height: BAR_HEIGHT,
+    padding: 5,
     flexDirection: 'row' as const,
-    gap: 6,
+    gap: 4,
   },
   tab: {
     flex: 1,
   },
-  tabActive: {
-    flexDirection: 'row' as const,
+  tabInner: {
+    flex: 1,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    gap: 8,
-    paddingVertical: 15,
+    gap: 4,
     borderRadius: radius.full,
   },
-  tabIdle: {
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    flex: 1,
-    paddingVertical: 15,
+  /** the lighter glass pill that carries the selection */
+  tabPill: {
+    backgroundColor: dark ? 'rgba(255, 255, 255, 0.13)' : 'rgba(255, 255, 255, 0.9)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: dark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 1)',
   },
   tabLabel: {
-    ...text.tab,
-    fontSize: 11,
-    lineHeight: 13,
+    fontFamily: font.medium,
+    fontSize: 10.5,
+    lineHeight: 12,
+  },
+  plus: {
+    width: BAR_HEIGHT,
+    height: BAR_HEIGHT,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  plusGlyph: {
+    fontFamily: font.light,
+    fontSize: 30,
+    lineHeight: 34,
+    color: colors.text,
+  },
+  pressed: {
+    opacity: 0.7,
   },
 }));

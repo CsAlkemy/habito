@@ -1,13 +1,15 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { AccentTile } from '@/components/AccentTile';
 import { Button, TextAction } from '@/components/Button';
+import { ColorSwatches } from '@/components/ColorSwatches';
+import { MilestonePicker } from '@/components/MilestonePicker';
 import { TimeField } from '@/components/TimeField';
 import { Check } from '@/components/Icons';
 import { Screen } from '@/components/Screen';
 import { useStore } from '@/data/store';
-import type { Schedule } from '@/data/types';
+import type { MilestoneKind, Schedule } from '@/data/types';
 import { themedStyles, useTheme } from '@/theme';
 import { ACCENT_FOLLOW, font, radius } from '@/theme/tokens';
 
@@ -37,7 +39,11 @@ export default function Onboarding() {
   const [name, setName] = useState('');
   const [cadence, setCadence] = useState<Schedule>('daily');
   const [habitName, setHabitName] = useState('');
+  const [kind, setKind] = useState<MilestoneKind>('streak');
+  const [goal, setGoal] = useState('');
+  const [target, setTarget] = useState('8');
   const [reminder, setReminder] = useState('08:00');
+  const [color, setColor] = useState(ACCENT_FOLLOW);
 
   const trimmedName = name.trim();
   const trimmedHabit = habitName.trim();
@@ -53,10 +59,14 @@ export default function Onboarding() {
     completeOnboarding(trimmedName, {
       id: `${trimmedHabit.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
       name: trimmedHabit,
-      kind: 'streak',
-      color: ACCENT_FOLLOW,
+      kind,
+      color,
       schedule: cadence,
       reminder: reminder || undefined,
+      ...(kind === 'count'
+        ? { target: Math.max(1, Number.parseInt(target, 10) || 1), unit: 'times' }
+        : {}),
+      ...(kind === 'custom' ? { goal: goal.trim() } : {}),
     });
     router.replace('/(tabs)');
   };
@@ -78,6 +88,12 @@ export default function Onboarding() {
         Step {step} of {TOTAL_STEPS}
       </Text>
 
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollBody}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       {step === 1 && (
         <>
           <Text style={[text.screenTitleLg, styles.title]}>What should we call you?</Text>
@@ -185,18 +201,44 @@ export default function Onboarding() {
             ))}
           </View>
 
-          <Text style={[text.label, styles.fieldLabel]}>Remind me at</Text>
-          <TimeField
-            value={reminder}
-            onChange={setReminder}
-            style={styles.timeField}
-            fieldStyle={styles.timeInput}
-            textStyle={styles.timeValue}
+          <Text style={[text.label, styles.fieldLabel]}>What counts as today&rsquo;s milestone</Text>
+          <MilestonePicker
+            kind={kind}
+            onKindChange={setKind}
+            goal={goal}
+            onGoalChange={setGoal}
+            target={target}
+            onTargetChange={setTarget}
+            style={styles.kinds}
           />
+
+          <Text style={[text.label, styles.fieldLabel]}>Remind me at</Text>
+          <View style={styles.reminderRow}>
+            <TimeField
+              value={reminder}
+              onChange={setReminder}
+              placeholder="Off"
+              style={styles.timeField}
+              fieldStyle={styles.timeInput}
+              textStyle={styles.timeValue}
+            />
+            {reminder.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Turn reminder off"
+                onPress={() => setReminder('')}
+                style={({ pressed }) => pressed && styles.pressed}
+              >
+                <Text style={styles.reminderOff}>Off</Text>
+              </Pressable>
+            )}
+          </View>
+
+          <Text style={[text.label, styles.fieldLabel]}>Colour</Text>
+          <ColorSwatches value={color} onChange={setColor} style={styles.swatchRow} />
         </>
       )}
-
-      <View style={styles.spacer} />
+      </ScrollView>
 
       <View style={styles.footer}>
         {step > 1 && <TextAction label="Back" onPress={onBack} style={styles.back} />}
@@ -243,8 +285,19 @@ const useStyles = themedStyles(({ colors }) => ({
     fontSize: 17,
     color: colors.text,
   },
-  timeField: {
+  reminderRow: {
     marginTop: 10,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 16,
+  },
+  reminderOff: {
+    fontFamily: font.medium,
+    fontSize: 14,
+    lineHeight: 17,
+    color: colors.textDim,
+  },
+  timeField: {
     alignSelf: 'flex-start' as const,
   },
   timeInput: {
@@ -314,14 +367,23 @@ const useStyles = themedStyles(({ colors }) => ({
   pressed: {
     opacity: 0.85,
   },
-  spacer: {
+  scroll: {
     flex: 1,
-    minHeight: 24,
+  },
+  scrollBody: {
+    paddingBottom: 24,
+  },
+  kinds: {
+    marginTop: 10,
+  },
+  swatchRow: {
+    marginTop: 12,
   },
   footer: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
     gap: 12,
+    paddingTop: 12,
   },
   back: {
     paddingVertical: 18,

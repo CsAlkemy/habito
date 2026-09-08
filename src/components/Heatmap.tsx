@@ -1,5 +1,5 @@
-import { Text, View } from 'react-native';
-import { addDays, fromDayKey, weekStart } from '@/lib/date';
+import { Pressable, Text, View } from 'react-native';
+import { addDays, daysBetween, fromDayKey, weekStart } from '@/lib/date';
 import { themedStyles, useTheme } from '@/theme';
 import { font, tracking } from '@/theme/tokens';
 
@@ -21,9 +21,13 @@ type Props = {
    * The grid is assumed to end on the current week, matching `heatmapCells`.
    */
   today?: string;
+  /** Makes past cells tappable; tapping reports the cell's day key. */
+  onSelectDay?: (day: string) => void;
+  /** The day whose cell is drawn with the selection outline. */
+  selectedDay?: string;
 };
 
-export function Heatmap({ cells, rowHeight, legend = false, today }: Props) {
+export function Heatmap({ cells, rowHeight, legend = false, today, onSelectDay, selectedDay }: Props) {
   const { colors, heatLegend } = useTheme();
   const styles = useStyles();
   // Columns come from the data rather than a constant, so the same grid can
@@ -36,8 +40,8 @@ export function Heatmap({ cells, rowHeight, legend = false, today }: Props) {
   // Date context: which column starts a new month, and where today sits.
   const monthLabels: { col: number; label: string }[] = [];
   let todayRow = -1;
-  if (today) {
-    const firstWeek = addDays(weekStart(today), -7 * (columns - 1));
+  const firstWeek = today ? addDays(weekStart(today), -7 * (columns - 1)) : null;
+  if (today && firstWeek) {
     const starts: { col: number; label: string }[] = [];
     let prev = -1;
     for (let col = 0; col < columns; col++) {
@@ -60,17 +64,28 @@ export function Heatmap({ cells, rowHeight, legend = false, today }: Props) {
         <View key={row} style={[styles.row, { gap }]}>
           {Array.from({ length: columns }, (_, col) => {
             const isToday = today !== undefined && col === columns - 1 && row === todayRow;
-            return (
-              <View
+            const day = firstWeek ? addDays(firstWeek, col * 7 + row) : null;
+            const tappable =
+              day !== null && today !== undefined && onSelectDay !== undefined &&
+              daysBetween(day, today) >= 0;
+            const cellStyle = [
+              styles.cell,
+              { borderRadius: gap < 3 ? 1.5 : 4 },
+              height ? { height } : { aspectRatio: 1 },
+              { backgroundColor: cells[row * columns + col] ?? colors.surfaceEmpty },
+              isToday && styles.todayCell,
+              day !== null && day === selectedDay && styles.selectedCell,
+            ];
+            return tappable ? (
+              <Pressable
                 key={col}
-                style={[
-                  styles.cell,
-                  { borderRadius: gap < 3 ? 1.5 : 4 },
-                  height ? { height } : { aspectRatio: 1 },
-                  { backgroundColor: cells[row * columns + col] ?? colors.surfaceEmpty },
-                  isToday && styles.todayCell,
-                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${day}`}
+                onPress={() => onSelectDay(day)}
+                style={cellStyle}
               />
+            ) : (
+              <View key={col} style={cellStyle} />
             );
           })}
         </View>
@@ -165,6 +180,10 @@ const useStyles = themedStyles(({ colors }) => ({
   todayCell: {
     borderWidth: 1.5,
     borderColor: colors.textSub,
+  },
+  selectedCell: {
+    borderWidth: 2,
+    borderColor: colors.text,
   },
   legend: {
     marginTop: 12,

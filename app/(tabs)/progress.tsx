@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { Sparkline } from '@/components/Charts';
+import { DayHistory } from '@/components/DayHistory';
 import { Heatmap } from '@/components/Heatmap';
 import { Screen } from '@/components/Screen';
 import { useAllStats, useHistoryHabits, useStore } from '@/data/store';
@@ -30,6 +31,7 @@ export default function Progress() {
   const allHabits = useHistoryHabits();
   const stats = useAllStats();
   const [range, setRange] = useState<(typeof RANGES)[number]>(RANGES[0]);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   // Archived habits still count toward the grid — retiring a habit should not
   // rewrite the spring it was part of.
@@ -52,7 +54,10 @@ export default function Progress() {
               key={option.id}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
-              onPress={() => setRange(option)}
+              onPress={() => {
+                setRange(option);
+                setSelectedDay(null);
+              }}
               style={[styles.segment, active && styles.segmentActive]}
             >
               <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
@@ -67,8 +72,15 @@ export default function Progress() {
         <Card r={radius.panel}>
           <Text style={text.sectionLabel}>Everything · last {range.label.toLowerCase()}</Text>
           <View style={styles.heatmap}>
-            <Heatmap cells={cells} rowHeight={17} today={todayKey} />
+            <Heatmap
+              cells={cells}
+              rowHeight={17}
+              today={todayKey}
+              selectedDay={selectedDay ?? undefined}
+              onSelectDay={(day) => setSelectedDay((prev) => (prev === day ? null : day))}
+            />
           </View>
+          {selectedDay && <DayHistory day={selectedDay} habits={allHabits} history={history} />}
         </Card>
 
         {habits.length === 0 && (

@@ -25,7 +25,11 @@ export type Habit = {
   /** the user's own words — custom habits only */
   goal?: string;
   schedule: Schedule;
-  /** 'HH:MM' local, undefined when the habit has no reminder */
+  /**
+   * 'HH:MM' local, undefined when the habit has no reminder. Count habits may
+   * carry several times, comma-separated ("08:00,12:30,18:00") — one
+   * notification fires per time.
+   */
   reminder?: string;
   /**
    * How the milestone screen names this habit in a sentence — "a full week of

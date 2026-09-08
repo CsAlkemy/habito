@@ -1,8 +1,9 @@
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { BarChart } from '@/components/Charts';
+import { DayHistory } from '@/components/DayHistory';
 import { Heatmap } from '@/components/Heatmap';
 import { NavHeader } from '@/components/NavHeader';
 import { Screen } from '@/components/Screen';
@@ -32,6 +33,7 @@ export default function HabitDetail() {
   const stats = useStats(habit);
   const { text, heatShades } = useTheme();
   const styles = useStyles();
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const cells = useMemo(
     () => (habit ? heatmapCells([habit], history, heatShades, todayKey, WEEKS_SHOWN) : []),
@@ -72,8 +74,15 @@ export default function HabitDetail() {
             <Text style={styles.panelMeta}>{heatmapRange()}</Text>
           </View>
           <View style={styles.heatmap}>
-            <Heatmap cells={cells} legend today={todayKey} />
+            <Heatmap
+              cells={cells}
+              legend
+              today={todayKey}
+              selectedDay={selectedDay ?? undefined}
+              onSelectDay={(day) => setSelectedDay((prev) => (prev === day ? null : day))}
+            />
           </View>
+          {selectedDay && <DayHistory day={selectedDay} habits={[habit]} history={history} />}
         </Card>
 
         <Card r={radius.panel} style={styles.panel}>

@@ -61,6 +61,25 @@ function parseTime(value: string | undefined): { hour: number; minute: number } 
 }
 
 /**
+ * A habit's reminder field holds one 'HH:MM', or several comma-separated for
+ * count habits ("08:00,12:30,18:00"). Invalid segments and duplicates are
+ * dropped rather than failing the whole habit.
+ */
+function parseReminderTimes(value: string | undefined): { hour: number; minute: number }[] {
+  const seen = new Set<string>();
+  const times: { hour: number; minute: number }[] = [];
+  for (const part of value?.split(',') ?? []) {
+    const at = parseTime(part);
+    if (!at) continue;
+    const key = `${at.hour}:${at.minute}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    times.push(at);
+  }
+  return times;
+}
+
+/**
  * Route notification taps to the surface they describe: a habit reminder opens
  * that habit's check-in sheet, the weekly recap opens the recap. `enabled`
  * should stay false until the store has hydrated — routing to a habit the
@@ -114,21 +133,21 @@ export async function syncReminders(db: SQLiteDatabase): Promise<void> {
 
   if (wantsReminders) {
     for (const habit of await loadHabits(db)) {
-      const at = parseTime(habit.reminder);
-      if (!at) continue;
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: habit.name,
-          body: habit.goal ?? 'Time to check in.',
-          data: { habitId: habit.id },
-          ...(Platform.OS === 'android' ? { channelId: 'reminders' } : {}),
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DAILY,
-          hour: at.hour,
-          minute: at.minute,
-        },
-      });
+      for (const at of parseReminderTimes(habit.reminder)) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: habit.name,
+            body: habit.goal ?? 'Time to check in.',
+            data: { habitId: habit.id },
+            ...(Platform.OS === 'android' ? { channelId: 'reminders' } : {}),
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DAILY,
+            hour: at.hour,
+            minute: at.minute,
+          },
+        });
+      }
     }
   }
 
