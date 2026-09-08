@@ -45,13 +45,15 @@ export function HabitRow({ habit, entry, streak, onPress, onLongPress }: Props) 
       style={({ pressed }) => [styles.row, { borderColor }, pressed && styles.pressed]}
     >
       {ratio > 0 && (
-        <View
-          pointerEvents="none"
-          style={[
-            styles.fill,
-            { width: `${ratio * 100}%`, backgroundColor: alpha(habitColor, dark ? 0.2 : 0.22) },
-          ]}
-        />
+        // Proportioned with flex rather than a % width: Yoga resolves the
+        // percentage of an absolute child against the content box, which left
+        // a 100% fill short of the row's right edge by its padding.
+        <View pointerEvents="none" style={styles.fillTrack}>
+          <View
+            style={[{ flex: ratio, backgroundColor: alpha(habitColor, dark ? 0.2 : 0.22) }]}
+          />
+          <View style={{ flex: 1 - ratio }} />
+        </View>
       )}
       <View
         style={[
@@ -94,11 +96,13 @@ const useStyles = themedStyles(({ colors }) => ({
     overflow: 'hidden' as const,
     borderWidth: 1,
   },
-  fill: {
+  fillTrack: {
     position: 'absolute' as const,
     left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
+    flexDirection: 'row' as const,
   },
   pressed: {
     opacity: 0.75,

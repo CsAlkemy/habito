@@ -45,12 +45,19 @@ function TabBar({ state, navigation }: BottomTabBarProps) {
 
         const focused = state.index === index;
         const Icon = ICONS[route.name];
-        const tint = focused ? colors.accentInk : colors.textDim;
 
-        const body = (
-          <View style={styles.tabInner}>
-            <Icon color={tint} />
-            <Text style={[styles.tabLabel, { color: tint }]}>{LABELS[route.name]}</Text>
+        // The active tab is a chip that says its name; the others sit back as
+        // quiet icons, so the bar reads at a glance without three labels.
+        const body = focused ? (
+          <View style={styles.tabActive}>
+            <Icon color={colors.accentInk} />
+            <Text style={[styles.tabLabel, { color: colors.accentInk }]}>
+              {LABELS[route.name]}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.tabIdle}>
+            <Icon color={colors.textDim} size={21} />
           </View>
         );
 
@@ -157,21 +164,30 @@ const useStyles = themedStyles(({ colors, dark, chromeShadow, text }) => ({
     backgroundColor: dark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(255, 255, 255, 0.95)',
   },
   row: {
-    padding: 8,
+    padding: 7,
     flexDirection: 'row' as const,
     gap: 6,
   },
   tab: {
     flex: 1,
   },
-  tabInner: {
+  tabActive: {
+    flexDirection: 'row' as const,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
-    gap: 5,
-    paddingVertical: 11,
+    gap: 8,
+    paddingVertical: 15,
     borderRadius: radius.full,
+  },
+  tabIdle: {
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    flex: 1,
+    paddingVertical: 15,
   },
   tabLabel: {
     ...text.tab,
+    fontSize: 11,
+    lineHeight: 13,
   },
 }));
