@@ -1,4 +1,4 @@
-import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
@@ -7,19 +7,30 @@ import { NOTIFICATION_DEFS, RECAP_NOTIFICATION } from '@/data/catalog';
 import { loadHabits, loadSettings } from '@/db/repo';
 
 /**
- * All notification scheduling lives here. Local notifications work in Expo Go
- * on both platforms, so none of this needs a development build.
+ * All notification scheduling lives here.
  *
  * The scheduling model is deliberately stateless: rather than tracking which
  * habit owns which notification id, `syncReminders` cancels everything and
  * rebuilds the schedule from the database. A handful of notifications is cheap
  * to re-register, and it removes the whole class of bug where an edited or
  * archived habit keeps firing because its id was never cleaned up.
+ *
+ * Expo Go on Android is excluded: since SDK 53, merely importing
+ * expo-notifications there throws (its push-token auto-registration side
+ * effect refuses to run), even though this app only schedules local
+ * notifications. The require below keeps the module out of that environment
+ * entirely — the app runs with reminders silently off, and a development
+ * build or installed APK gets the real behavior. Expo Go on iOS still
+ * supports local notifications.
  */
 
-const supported = Platform.OS !== 'web';
+const supported = Platform.OS !== 'web' && !(Platform.OS === 'android' && isRunningInExpoGo());
 
-Notifications.setNotificationHandler({
+const Notifications = supported
+  ? (require('expo-notifications') as typeof import('expo-notifications'))
+  : null;
+
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
     shouldSetBadge: false,
@@ -29,7 +40,7 @@ Notifications.setNotificationHandler({
 });
 
 export async function ensurePermissions(): Promise<boolean> {
-  if (!supported) return false;
+  if (!Notifications) return false;
   const current = await Notifications.getPermissionsAsync();
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
@@ -40,7 +51,7 @@ export async function ensurePermissions(): Promise<boolean> {
 }
 
 async function ensureAndroidChannel(): Promise<void> {
-  if (Platform.OS !== 'android') return;
+  if (!Notifications || Platform.OS !== 'android') return;
   await Notifications.setNotificationChannelAsync('reminders', {
     name: 'Habit reminders',
     importance: Notifications.AndroidImportance.DEFAULT,
@@ -88,7 +99,7 @@ function parseReminderTimes(value: string | undefined): { hour: number; minute: 
 export function useNotificationDeepLinks(enabled: boolean): void {
   const router = useRouter();
   useEffect(() => {
-    if (!supported || !enabled) return;
+    if (!Notifications || !enabled) return;
 
     const open = (data: unknown) => {
       const { habitId, route } = (data ?? {}) as { habitId?: string; route?: string };
@@ -114,7 +125,7 @@ export function useNotificationDeepLinks(enabled: boolean): void {
  * toggle on the You screen.
  */
 export async function syncReminders(db: SQLiteDatabase): Promise<void> {
-  if (!supported) return;
+  if (!Notifications) return;
 
   await Notifications.cancelAllScheduledNotificationsAsync();
 
