@@ -5,6 +5,7 @@ import { addDays, dayKey, isScheduled, weekStart } from '../date';
 import {
   bestStreak,
   completionPct,
+  completionTrend,
   currentStreak,
   dayCredit,
   heatmapCells,
@@ -274,5 +275,52 @@ describe('weeklyRecap comparison', () => {
     };
     const recap = weeklyRecap([h], history, TODAY);
     assert.equal(recap.hasComparison, true);
+  });
+});
+
+describe('completionTrend', () => {
+  const water = habit({ id: 'w' });
+  const salah = habit({ id: 's' });
+  const history: History = {
+    w: days('done', 'done', 'done', 'done'),
+    s: days(null, 'done', null, 'skipped'),
+  };
+
+  it('draws one point per day for a week and one per week for six months', () => {
+    assert.equal(completionTrend([water], history, TODAY, 1).points.length, 7);
+    assert.equal(completionTrend([water], history, TODAY, 5).points.length, 35);
+    assert.equal(completionTrend([water], history, TODAY, 26).points.length, 26);
+  });
+
+  it('leaves days after today as gaps', () => {
+    const { points } = completionTrend([water, salah], history, TODAY, 1);
+    // Wednesday: Mon and Tue are logged, Thu–Sun have not happened.
+    assert.deepEqual(points.slice(3), [null, null, null, null]);
+  });
+
+  it('pools every due habit into one percentage per day', () => {
+    const { points } = completionTrend([water, salah], history, TODAY, 1);
+    // Yesterday (Tue): both done → 100. Monday: water done, salah not → 50.
+    assert.equal(points[1], 100);
+    assert.equal(points[0], 50);
+    // Today: water done, salah unlogged — an open today doesn't count as a miss.
+    assert.equal(points[2], 100);
+  });
+
+  it('labels a week by weekday and a month by week start', () => {
+    assert.deepEqual(
+      completionTrend([water], history, TODAY, 1).labels.map((l) => l.text),
+      ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+    );
+    const month = completionTrend([water], history, TODAY, 5).labels;
+    assert.equal(month.length, 5);
+    assert.equal(month[0].index, 0);
+  });
+
+  it('reports the range average and the period before it', () => {
+    const trend = completionTrend([water], history, TODAY, 1);
+    // Water was done every day of this week so far.
+    assert.equal(trend.average, 100);
+    assert.equal(typeof trend.previous, 'number');
   });
 });

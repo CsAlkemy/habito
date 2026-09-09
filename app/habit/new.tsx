@@ -1,7 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ColorSwatches } from '@/components/ColorSwatches';
+import { IconPicker } from '@/components/IconPicker';
 import { MilestonePicker } from '@/components/MilestonePicker';
 import { NavHeader } from '@/components/NavHeader';
 import { Screen } from '@/components/Screen';
@@ -10,7 +11,8 @@ import { useStore } from '@/data/store';
 import type { MilestoneKind, Schedule } from '@/data/types';
 import { scheduleLabel } from '@/lib/date';
 import { themedStyles, useTheme } from '@/theme';
-import { ACCENT_FOLLOW, font, GUTTER, radius } from '@/theme/tokens';
+import { alpha } from '@/theme/color';
+import { ACCENT_FOLLOW, font, GUTTER, radius, resolveHabitColor } from '@/theme/tokens';
 
 const SCHEDULES: Schedule[] = ['daily', 'weekdays', 'some'];
 
@@ -19,18 +21,6 @@ const MAX_REMINDERS = 8;
 
 const toHHMM = (minutes: number) =>
   `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-
-/**
- * Suggested reminder times for "N times a day": up to six, spread evenly
- * between 08:00 and 20:00 and kept on 15-minute marks.
- */
-function prefillTimes(targetText: string): string[] {
-  const n = Math.min(Math.max(Number.parseInt(targetText, 10) || 1, 1), 6);
-  if (n === 1) return ['08:00'];
-  return Array.from({ length: n }, (_, i) =>
-    toHHMM(Math.round((8 * 60 + (i * 12 * 60) / (n - 1)) / 15) * 15),
-  );
-}
 
 /**
  * Screen 2e — new habit, and the edit form behind the habit detail's "Edit".
@@ -52,14 +42,14 @@ export default function NewHabit() {
   const [goal, setGoal] = useState(existing?.goal ?? '');
   const [target, setTarget] = useState(String(existing?.target ?? 8));
   const [schedule, setSchedule] = useState<Schedule>(existing?.schedule ?? 'daily');
+  // Every habit starts with a single morning reminder; "N times a day" habits
+  // grow the list through "Add a time" rather than being handed a pile of them.
   const [reminders, setReminders] = useState<string[]>(() =>
     existing ? (existing.reminder?.split(',').filter(Boolean) ?? []) : ['08:00'],
   );
   const [color, setColor] = useState(existing?.color ?? ACCENT_FOLLOW);
-
-  // Once the user has touched the reminder list (or is editing a saved habit),
-  // changing the kind or target stops re-prefilling it over their choices.
-  const remindersTouched = useRef(Boolean(existing));
+  const [icon, setIcon] = useState<string | undefined>(existing?.icon);
+  const [pickingIcon, setPickingIcon] = useState(false);
 
   const trimmed = name.trim();
   const canSave = trimmed.length > 0;
@@ -68,25 +58,13 @@ export default function NewHabit() {
   const cycle = <T,>(list: T[], current: T, set: (next: T) => void) =>
     set(list[(list.indexOf(current) + 1) % list.length]);
 
-  const editReminders = (next: string[]) => {
-    remindersTouched.current = true;
-    setReminders(next);
-  };
+  const editReminders = setReminders;
 
+  /** A new slot lands an hour after the last one, so the list stays in order. */
   const addReminder = () => {
     const last = /^(\d{1,2}):(\d{2})$/.exec(reminders[reminders.length - 1] ?? '');
     const next = last ? toHHMM(((Number(last[1]) + 1) % 24) * 60 + Number(last[2])) : '08:00';
     editReminders([...reminders, next]);
-  };
-
-  const changeKind = (next: MilestoneKind) => {
-    setKind(next);
-    if (!remindersTouched.current) setReminders(next === 'count' ? prefillTimes(target) : ['08:00']);
-  };
-
-  const changeTarget = (next: string) => {
-    setTarget(next);
-    if (kind === 'count' && !remindersTouched.current) setReminders(prefillTimes(next));
   };
 
   const fields = () => {
@@ -96,6 +74,7 @@ export default function NewHabit() {
     return {
       name: trimmed,
       color,
+      icon,
       schedule,
       reminder: times.join(',') || undefined,
       ...(kind === 'count'
@@ -149,25 +128,41 @@ export default function NewHabit() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
         <View style={styles.nameCard}>
-          <Text style={text.label}>Name</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Name your habit"
-            placeholderTextColor={colors.textDim}
-            style={styles.nameInput}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={icon ? `Icon ${icon}, change` : 'Choose an icon'}
+            onPress={() => setPickingIcon(true)}
+            style={({ pressed }) => [
+              styles.iconTile,
+              { backgroundColor: alpha(resolveHabitColor(color, colors.accent), 0.22) },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text allowFontScaling={false} style={icon ? styles.iconGlyph : styles.iconEmpty}>
+              {icon ?? '+'}
+            </Text>
+          </Pressable>
+          <View style={styles.nameField}>
+            <Text style={text.label}>Name</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Name your habit"
+              placeholderTextColor={colors.textDim}
+              style={styles.nameInput}
+            />
+          </View>
         </View>
 
         <Text style={[text.label, styles.groupLabel]}>What counts as today&rsquo;s milestone</Text>
 
         <MilestonePicker
           kind={kind}
-          onKindChange={changeKind}
+          onKindChange={setKind}
           goal={goal}
           onGoalChange={setGoal}
           target={target}
-          onTargetChange={changeTarget}
+          onTargetChange={setTarget}
           locked={isEdit}
           style={styles.kinds}
         />
@@ -308,6 +303,12 @@ export default function NewHabit() {
           </Pressable>
         )}
       </ScrollView>
+      <IconPicker
+        visible={pickingIcon}
+        value={icon}
+        onChange={setIcon}
+        onDismiss={() => setPickingIcon(false)}
+      />
     </Screen>
   );
 }
@@ -333,6 +334,30 @@ const useStyles = themedStyles(({ colors }) => ({
     backgroundColor: colors.surface,
     borderRadius: radius.card,
     padding: 16,
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 14,
+  },
+  iconTile: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.sm,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  iconGlyph: {
+    fontSize: 26,
+    lineHeight: 32,
+  },
+  iconEmpty: {
+    fontFamily: font.light,
+    fontSize: 26,
+    lineHeight: 30,
+    color: colors.textDim,
+  },
+  nameField: {
+    flex: 1,
+    minWidth: 0,
   },
   nameInput: {
     marginTop: 9,

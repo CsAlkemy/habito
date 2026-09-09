@@ -1,4 +1,6 @@
-import { Text, View } from 'react-native';
+import { useState } from 'react';
+import { type LayoutChangeEvent, Text, View } from 'react-native';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 import { themedStyles, useTheme } from '@/theme';
 import { alpha } from '@/theme/color';
 import { font, tracking } from '@/theme/tokens';
@@ -80,7 +82,187 @@ export function Sparkline({ values, color }: { values: readonly number[]; color:
   );
 }
 
+type LineChartProps = {
+  /** 0–100 per point, oldest first; null gaps break the line */
+  points: readonly (number | null)[];
+  /** sparse axis labels, keyed by point index */
+  labels: readonly { index: number; text: string }[];
+  /** plot height in px, excluding labels */
+  height: number;
+  color: string;
+};
+
+const LINE_PAD = 5;
+const AXIS_WIDTH = 24;
+
+/**
+ * Path through the points, curved with horizontal control handles so the line
+ * eases between values without ever swinging above 100 or below 0.
+ */
+function smoothPath(pts: { x: number; y: number }[]): string {
+  return pts
+    .map((p, i) => {
+      if (i === 0) return `M ${p.x} ${p.y}`;
+      const prev = pts[i - 1];
+      const mid = (prev.x + p.x) / 2;
+      return `C ${mid} ${prev.y} ${mid} ${p.y} ${p.x} ${p.y}`;
+    })
+    .join(' ');
+}
+
+/** The completion trend line on the Progress screen. */
+export function LineChart({ points, labels, height, color }: LineChartProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
+  const [width, setWidth] = useState(0);
+  const onLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
+
+  const plotWidth = Math.max(0, width - AXIS_WIDTH);
+  const n = points.length;
+  const x = (i: number) => (n <= 1 ? plotWidth / 2 : (i / (n - 1)) * plotWidth);
+  const y = (pct: number) => LINE_PAD + (1 - pct / 100) * (height - LINE_PAD * 2);
+
+  // Runs of consecutive logged points; each becomes its own curve so a gap in
+  // the data reads as a gap, not as a slope across it.
+  const runs: { x: number; y: number }[][] = [];
+  points.forEach((pct, i) => {
+    if (pct === null) {
+      if (runs.length && runs[runs.length - 1].length) runs.push([]);
+      return;
+    }
+    if (!runs.length) runs.push([]);
+    runs[runs.length - 1].push({ x: x(i), y: y(pct) });
+  });
+  const segments = runs.filter((run) => run.length > 0);
+  const last = segments.length ? segments[segments.length - 1].slice(-1)[0] : null;
+  const gradientId = `trend-${color.replace(/[^a-zA-Z0-9]/g, '')}`;
+
+  return (
+    <View>
+      <View onLayout={onLayout} style={{ height }}>
+        {width > 0 && (
+          <Svg width={width} height={height}>
+            <Defs>
+              <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={color} stopOpacity={0.28} />
+                <Stop offset="1" stopColor={color} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            {[0, 50, 100].map((pct) => (
+              <Line
+                key={pct}
+                x1={0}
+                x2={plotWidth}
+                y1={y(pct)}
+                y2={y(pct)}
+                stroke={colors.divider}
+                strokeWidth={1}
+                strokeDasharray={pct === 0 ? undefined : '3 4'}
+              />
+            ))}
+            {segments.map((run, i) =>
+              run.length === 1 ? (
+                <Circle key={i} cx={run[0].x} cy={run[0].y} r={3} fill={color} />
+              ) : (
+                <Path
+                  key={`area-${i}`}
+                  d={`${smoothPath(run)} L ${run[run.length - 1].x} ${y(0)} L ${run[0].x} ${y(0)} Z`}
+                  fill={`url(#${gradientId})`}
+                />
+              ),
+            )}
+            {segments.map(
+              (run, i) =>
+                run.length > 1 && (
+                  <Path
+                    key={`line-${i}`}
+                    d={smoothPath(run)}
+                    stroke={color}
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    fill="none"
+                  />
+                ),
+            )}
+            {last && (
+              <Circle cx={last.x} cy={last.y} r={4.5} fill={color} stroke={colors.surface} strokeWidth={2} />
+            )}
+          </Svg>
+        )}
+        {[100, 50, 0].map((pct) => (
+          <Text key={pct} style={[styles.axisLabel, { top: y(pct) - 6 }]}>
+            {pct}
+          </Text>
+        ))}
+        {segments.length === 0 && (
+          <View pointerEvents="none" style={styles.lineEmpty}>
+            <Text style={styles.lineEmptyText}>Nothing logged in this range yet.</Text>
+          </View>
+        )}
+      </View>
+      <View style={[styles.lineLabels, { width: plotWidth }]}>
+        {labels.map(({ index, text }) => (
+          <Text
+            key={`${index}-${text}`}
+            style={[
+              styles.lineLabel,
+              { left: x(index) },
+              // Keep the first label from hanging off the left edge.
+              index === 0 && styles.lineLabelStart,
+            ]}
+          >
+            {text}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 const useStyles = themedStyles(({ colors }) => ({
+  axisLabel: {
+    position: 'absolute' as const,
+    right: 0,
+    width: AXIS_WIDTH - 6,
+    textAlign: 'right' as const,
+    fontFamily: font.medium,
+    fontSize: 8.5,
+    lineHeight: 12,
+    color: colors.textSub,
+  },
+  lineEmpty: {
+    position: 'absolute' as const,
+    top: 0,
+    right: AXIS_WIDTH,
+    bottom: 0,
+    left: 0,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  lineEmptyText: {
+    fontFamily: font.regular,
+    fontSize: 12.5,
+    lineHeight: 16,
+    color: colors.textSub,
+  },
+  lineLabels: {
+    marginTop: 8,
+    height: 12,
+    position: 'relative' as const,
+  },
+  lineLabel: {
+    position: 'absolute' as const,
+    fontFamily: font.medium,
+    fontSize: 9.5,
+    lineHeight: 11,
+    letterSpacing: tracking(0.06, 9.5),
+    color: colors.textSub,
+    transform: [{ translateX: '-50%' }],
+  },
+  lineLabelStart: {
+    transform: [{ translateX: 0 }],
+  },
   plot: {
     flexDirection: 'row' as const,
     alignItems: 'flex-end' as const,

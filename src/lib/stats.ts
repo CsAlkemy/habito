@@ -20,6 +20,8 @@ import {
  */
 
 const HEATMAP_WEEKS = 12;
+const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SPARK_WEEKS = 8;
 const COMPLETION_WINDOW = 30;
 
@@ -212,8 +214,6 @@ export function weeklyBars(habit: Habit, history: History, today = dayKey()): Ba
   }));
 }
 
-const WEEKDAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
 /** Seven daily bars for the weekly recap. */
 export function recapBars(habits: Habit[], history: History, weekStartKey: string): Bar[] {
   return WEEKDAY_LABELS.map((label, i) => {
@@ -234,10 +234,106 @@ export function recapBars(habits: Habit[], history: History, weekStartKey: strin
 }
 
 // ---------------------------------------------------------------------------
+// Completion trend
+// ---------------------------------------------------------------------------
+
+export type Trend = {
+  /** completion per bucket, oldest first; null where nothing was due yet */
+  points: (number | null)[];
+  /** sparse axis labels, keyed by point index */
+  labels: { index: number; text: string }[];
+  /** completion across the whole range, or null when nothing was due */
+  average: number | null;
+  /** the same figure for the period just before, for the delta */
+  previous: number | null;
+};
+
+/**
+ * Completion across every habit over a span of days, as one percentage. The
+ * rules match `completionPct`: skipped days leave the fraction, days before a
+ * habit existed don't count against it, and an unlogged today is left out so
+ * the figure doesn't sag every morning.
+ */
+function spanCompletion(
+  habits: Habit[],
+  history: History,
+  from: string,
+  to: string,
+  today: string,
+): number | null {
+  if (daysBetween(from, today) < 0) return null;
+  const last = daysBetween(to, today) < 0 ? today : to;
+  let due = 0;
+  let done = 0;
+  for (const day of dayRange(from, last)) {
+    for (const habit of habits) {
+      if (!isScheduled(habit.schedule, day)) continue;
+      if (daysBetween(habit.createdAt, day) < 0) continue;
+      const entry = history[habit.id]?.[day];
+      if (entry?.status === 'skipped') continue;
+      const credit = dayCredit(habit, entry);
+      if (credit === 0 && day === today) continue;
+      due += 1;
+      done += credit;
+    }
+  }
+  return due === 0 ? null : Math.round((done / due) * 100);
+}
+
+/**
+ * The line under the Progress heatmap, for the same range: one point per day
+ * up to a month, one per week beyond that — a 26-point daily line would be
+ * noise, and a 5-point weekly one would barely be a line.
+ */
+export function completionTrend(
+  habits: Habit[],
+  history: History,
+  today = dayKey(),
+  weeks = HEATMAP_WEEKS,
+): Trend {
+  const daily = weeks <= 5;
+  const size = daily ? 1 : 7;
+  const count = daily ? weeks * 7 : weeks;
+  const start = addDays(weekStart(today), -7 * (weeks - 1));
+  const end = addDays(start, count * size - 1);
+
+  const points: (number | null)[] = [];
+  const monthStarts: { index: number; text: string }[] = [];
+  const labels: { index: number; text: string }[] = [];
+  let prevMonth = -1;
+  for (let i = 0; i < count; i++) {
+    const from = addDays(start, i * size);
+    points.push(spanCompletion(habits, history, from, addDays(from, size - 1), today));
+
+    const date = fromDayKey(from);
+    if (weeks === 1) {
+      labels.push({ index: i, text: WEEKDAY_LABELS[i] });
+    } else if (daily) {
+      if (i % 7 === 0) labels.push({ index: i, text: `${date.getDate()} ${MONTHS[date.getMonth()]}` });
+    } else if (date.getMonth() !== prevMonth) {
+      monthStarts.push({ index: i, text: MONTHS[date.getMonth()] });
+      prevMonth = date.getMonth();
+    }
+  }
+  // A year has no room for twelve labels; keep every other one, counting back
+  // from the newest so the current month survives — as the heatmap does.
+  if (!daily) {
+    const step = weeks > 40 ? 2 : 1;
+    for (let i = monthStarts.length - 1; i >= 0; i -= step) labels.unshift(monthStarts[i]);
+  }
+
+  return {
+    points,
+    labels,
+    average: spanCompletion(habits, history, start, end, today),
+    previous: spanCompletion(habits, history, addDays(start, -count * size), addDays(start, -1), today),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Weekly recap
 // ---------------------------------------------------------------------------
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const LONG_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export type Recap = {

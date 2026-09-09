@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Card } from '@/components/Card';
 import { BarChart } from '@/components/Charts';
-import { DayHistory } from '@/components/DayHistory';
+import { DayHistorySheet } from '@/components/DayHistorySheet';
 import { Heatmap } from '@/components/Heatmap';
 import { NavHeader } from '@/components/NavHeader';
 import { Screen } from '@/components/Screen';
@@ -12,7 +12,8 @@ import { useHabit, useStats, useStore } from '@/data/store';
 import { habitDetailLine } from '@/lib/format';
 import { heatmapCells, weeklyBars } from '@/lib/stats';
 import { themedStyles, useTheme } from '@/theme';
-import { font, GUTTER, radius, tracking } from '@/theme/tokens';
+import { alpha } from '@/theme/color';
+import { font, GUTTER, radius, resolveHabitColor, tracking } from '@/theme/tokens';
 
 const WEEKS_SHOWN = 12;
 
@@ -31,7 +32,7 @@ export default function HabitDetail() {
   const { habit } = useHabit(id);
   const { history, todayKey } = useStore();
   const stats = useStats(habit);
-  const { text, heatShades } = useTheme();
+  const { text, heatShades, colors } = useTheme();
   const styles = useStyles();
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -58,6 +59,18 @@ export default function HabitDetail() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
         <View style={styles.title}>
+          {habit.icon && (
+            <View
+              style={[
+                styles.titleIcon,
+                { backgroundColor: alpha(resolveHabitColor(habit.color, colors.accent), 0.22) },
+              ]}
+            >
+              <Text allowFontScaling={false} style={styles.titleGlyph}>
+                {habit.icon}
+              </Text>
+            </View>
+          )}
           <Text style={text.screenTitle}>{habit.name}</Text>
           <Text style={styles.subtitle}>{habitDetailLine(habit)}</Text>
         </View>
@@ -79,10 +92,9 @@ export default function HabitDetail() {
               legend
               today={todayKey}
               selectedDay={selectedDay ?? undefined}
-              onSelectDay={(day) => setSelectedDay((prev) => (prev === day ? null : day))}
+              onSelectDay={setSelectedDay}
             />
           </View>
-          {selectedDay && <DayHistory day={selectedDay} habits={[habit]} history={history} />}
         </Card>
 
         <Card r={radius.panel} style={styles.panel}>
@@ -94,6 +106,12 @@ export default function HabitDetail() {
           </View>
         </Card>
       </ScrollView>
+      <DayHistorySheet
+        day={selectedDay}
+        habits={[habit]}
+        history={history}
+        onDismiss={() => setSelectedDay(null)}
+      />
     </Screen>
   );
 }
@@ -108,6 +126,18 @@ const useStyles = themedStyles(({ colors }) => ({
   },
   title: {
     paddingTop: 18,
+  },
+  titleIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.sm,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    marginBottom: 12,
+  },
+  titleGlyph: {
+    fontSize: 24,
+    lineHeight: 30,
   },
   subtitle: {
     marginTop: 6,

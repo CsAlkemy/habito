@@ -64,7 +64,12 @@ export function HabitRow({ habit, entry, streak, onPress, onLongPress }: Props) 
         ]}
       >
         {done && <Check color={mix(22, '#000000', habitColor)} width={14} />}
-        {skipped && <View style={styles.skipDash} />}
+        {!done && skipped && <View style={styles.skipDash} />}
+        {!done && !skipped && habit.icon && (
+          <Text allowFontScaling={false} style={styles.tileIcon}>
+            {habit.icon}
+          </Text>
+        )}
       </View>
 
       <View style={styles.body}>
@@ -113,6 +118,10 @@ const useStyles = themedStyles(({ colors }) => ({
     borderRadius: radius.tile,
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
+  },
+  tileIcon: {
+    fontSize: 18,
+    lineHeight: 22,
   },
   skipDash: {
     width: 12,

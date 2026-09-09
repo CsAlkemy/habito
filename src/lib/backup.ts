@@ -51,6 +51,7 @@ function toHabit(raw: unknown): Habit | null {
     name: h.name,
     kind: h.kind as MilestoneKind,
     color: str(h.color) ? h.color : 'accent',
+    icon: optStr(h.icon),
     unit: optStr(h.unit),
     target: typeof h.target === 'number' ? h.target : undefined,
     goal: optStr(h.goal),

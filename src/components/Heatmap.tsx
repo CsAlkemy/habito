@@ -5,8 +5,8 @@ import { font, tracking } from '@/theme/tokens';
 
 const ROWS = 7;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-/** Mon-first rail; only every other day is labelled to keep the gutter quiet. */
-const DAY_RAIL = ['M', '', 'W', '', 'F', '', ''];
+/** Mon-first weekday rail. */
+const DAY_RAIL = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const RAIL_WIDTH = 16;
 
 type Props = {
@@ -31,11 +31,17 @@ export function Heatmap({ cells, rowHeight, legend = false, today, onSelectDay, 
   const { colors, heatLegend } = useTheme();
   const styles = useStyles();
   // Columns come from the data rather than a constant, so the same grid can
-  // draw twelve weeks or a full year. Dense grids tighten up: a 52-column year
-  // at the 12-week gap would spend more width on gutters than on cells.
+  // draw one week or a full year. Dense grids tighten up: a 52-column year at
+  // the 12-week gap would spend more width on gutters than on cells. Sparse
+  // grids (a month) grow taller so the wide cells don't read as bars.
   const columns = Math.max(1, Math.round(cells.length / ROWS));
   const gap = columns > 40 ? 1.5 : columns > 20 ? 2.5 : 4;
-  const height = rowHeight ? Math.max(6, rowHeight * (columns > 20 ? 12 / columns + 0.4 : 1)) : undefined;
+  const heightScale = columns > 20 ? 12 / columns + 0.4 : columns <= 6 ? 1.6 : 1;
+  const height = rowHeight ? Math.max(6, rowHeight * heightScale) : undefined;
+  // Day-of-month numbers only fit the 12-week grid and sparser; denser grids
+  // would turn them into noise, so there the month row and the tap read-out
+  // carry the date.
+  const showDates = today !== undefined && columns <= 12;
 
   // Date context: which column starts a new month, and where today sits.
   const monthLabels: { col: number; label: string }[] = [];
@@ -58,36 +64,80 @@ export function Heatmap({ cells, rowHeight, legend = false, today, onSelectDay, 
     todayRow = (fromDayKey(today).getDay() + 6) % 7;
   }
 
+  /** One day square: colour, today/selection outline, optional date, tap. */
+  const renderCell = (row: number, col: number, shape: object, dateStyle?: object) => {
+    const isToday = today !== undefined && col === columns - 1 && row === todayRow;
+    const day = firstWeek ? addDays(firstWeek, col * 7 + row) : null;
+    const future = day !== null && today !== undefined && daysBetween(day, today) < 0;
+    const tappable = day !== null && today !== undefined && onSelectDay !== undefined && !future;
+    const cellStyle = [
+      styles.cell,
+      { borderRadius: gap < 3 ? 1.5 : 4 },
+      shape,
+      { backgroundColor: cells[row * columns + col] ?? colors.surfaceEmpty },
+      isToday && styles.todayCell,
+      day !== null && day === selectedDay && styles.selectedCell,
+    ];
+    const date =
+      showDates && day !== null ? (
+        <Text
+          allowFontScaling={false}
+          style={[styles.dateLabel, dateStyle, future && styles.dateLabelFuture]}
+        >
+          {fromDayKey(day).getDate()}
+        </Text>
+      ) : null;
+    return tappable ? (
+      <Pressable
+        key={col}
+        accessibilityRole="button"
+        accessibilityLabel={`Show ${day}`}
+        onPress={() => onSelectDay(day)}
+        style={cellStyle}
+      >
+        {date}
+      </Pressable>
+    ) : (
+      <View key={col} style={cellStyle}>
+        {date}
+      </View>
+    );
+  };
+
+  const legendNode = legend ? (
+    <View style={styles.legend}>
+      <Text style={styles.legendLabel}>Less</Text>
+      {heatLegend.map((shade) => (
+        <View key={shade} style={[styles.swatch, { backgroundColor: shade }]} />
+      ))}
+      <Text style={styles.legendLabel}>More</Text>
+    </View>
+  ) : null;
+
+  // A single week is laid across rather than down: seven wide day tiles with
+  // the weekday above each, which is how a phone calendar shows a week.
+  if (today && columns === 1) {
+    return (
+      <View>
+        <View style={styles.strip}>
+          {DAY_RAIL.map((label, row) => (
+            <View key={row} style={styles.stripDay}>
+              <Text style={styles.stripLabel}>{label}</Text>
+              {renderCell(row, 0, styles.stripCell, styles.stripDate)}
+            </View>
+          ))}
+        </View>
+        {legendNode}
+      </View>
+    );
+  }
+
+  const shape = height ? { height } : { aspectRatio: 1 };
   const grid = (
     <View style={[styles.grid, { gap }]}>
       {Array.from({ length: ROWS }, (_, row) => (
         <View key={row} style={[styles.row, { gap }]}>
-          {Array.from({ length: columns }, (_, col) => {
-            const isToday = today !== undefined && col === columns - 1 && row === todayRow;
-            const day = firstWeek ? addDays(firstWeek, col * 7 + row) : null;
-            const tappable =
-              day !== null && today !== undefined && onSelectDay !== undefined &&
-              daysBetween(day, today) >= 0;
-            const cellStyle = [
-              styles.cell,
-              { borderRadius: gap < 3 ? 1.5 : 4 },
-              height ? { height } : { aspectRatio: 1 },
-              { backgroundColor: cells[row * columns + col] ?? colors.surfaceEmpty },
-              isToday && styles.todayCell,
-              day !== null && day === selectedDay && styles.selectedCell,
-            ];
-            return tappable ? (
-              <Pressable
-                key={col}
-                accessibilityRole="button"
-                accessibilityLabel={`Show ${day}`}
-                onPress={() => onSelectDay(day)}
-                style={cellStyle}
-              />
-            ) : (
-              <View key={col} style={cellStyle} />
-            );
-          })}
+          {Array.from({ length: columns }, (_, col) => renderCell(row, col, shape))}
         </View>
       ))}
     </View>
@@ -123,15 +173,7 @@ export function Heatmap({ cells, rowHeight, legend = false, today, onSelectDay, 
         grid
       )}
 
-      {legend && (
-        <View style={styles.legend}>
-          <Text style={styles.legendLabel}>Less</Text>
-          {heatLegend.map((shade) => (
-            <View key={shade} style={[styles.swatch, { backgroundColor: shade }]} />
-          ))}
-          <Text style={styles.legendLabel}>More</Text>
-        </View>
-      )}
+      {legendNode}
     </View>
   );
 }
@@ -176,6 +218,43 @@ const useStyles = themedStyles(({ colors }) => ({
   },
   cell: {
     flex: 1,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  dateLabel: {
+    fontFamily: font.medium,
+    fontSize: 8.5,
+    lineHeight: 10,
+    color: colors.textSub,
+  },
+  dateLabelFuture: {
+    color: colors.textLocked,
+  },
+  strip: {
+    flexDirection: 'row' as const,
+    gap: 6,
+  },
+  stripDay: {
+    flex: 1,
+    alignItems: 'stretch' as const,
+    gap: 6,
+  },
+  stripLabel: {
+    fontFamily: font.medium,
+    fontSize: 9.5,
+    lineHeight: 12,
+    letterSpacing: tracking(0.1, 9.5),
+    color: colors.textSub,
+    textAlign: 'center' as const,
+  },
+  stripCell: {
+    aspectRatio: 1,
+    borderRadius: 10,
+  },
+  stripDate: {
+    fontSize: 13,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
   todayCell: {
     borderWidth: 1.5,

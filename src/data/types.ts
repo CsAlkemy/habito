@@ -18,6 +18,8 @@ export type Habit = {
   kind: MilestoneKind;
   /** dot / chart colour on the progress screen */
   color: string;
+  /** a single emoji shown on the habit's tile; undefined draws the plain tile */
+  icon?: string;
   /** 'glasses', 'minutes' — count habits only */
   unit?: string;
   /** daily target — count habits only */

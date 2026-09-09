@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { AccentTile } from '@/components/AccentTile';
 import { Button } from '@/components/Button';
+import { Celebration } from '@/components/Celebration';
 import { SheetScreen } from '@/components/Sheet';
-import { useHabit, useStats, useStore } from '@/data/store';
+import { useHabit, useStats, useStore, useTodayProgress } from '@/data/store';
 import { themedStyles, useTheme } from '@/theme';
 import { font, radius, tracking } from '@/theme/tokens';
 
@@ -17,9 +18,16 @@ export default function CheckIn() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { habit, entry } = useHabit(id);
   const { streak } = useStats(habit);
+  const { done, total } = useTodayProgress();
   const { setValue, bumpValue, markDone, reopen } = useStore();
   const [typing, setTyping] = useState(false);
   const [draft, setDraft] = useState('');
+  const [celebrating, setCelebrating] = useState(false);
+
+  const leave = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)');
+  }, [router]);
 
   // Redirect rather than navigate: calling router during render is a side
   // effect React is entitled to run twice.
@@ -51,13 +59,16 @@ export default function CheckIn() {
     router.back();
   };
 
+  // A milestone day gets the full-screen moment; every other completion gets
+  // the short celebration overlay before the sheet closes. `streak` and
+  // `done` re-render with the write, so the overlay reads the new figures.
   const onDone = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     const milestone = markDone(habit.id);
     if (milestone !== null) {
       router.replace(`/milestone?habit=${habit.id}&count=${milestone}`);
     } else {
-      router.back();
+      setCelebrating(true);
     }
   };
 
@@ -173,6 +184,10 @@ export default function CheckIn() {
         <Text style={[text.caption, styles.hint]}>
           {Platform.OS === 'web' ? 'Click and hold' : 'Long-press'} the counter to type a number
         </Text>
+      )}
+
+      {celebrating && (
+        <Celebration habit={habit} streak={streak} allDone={total > 0 && done === total} onFinish={leave} />
       )}
     </SheetScreen>
   );

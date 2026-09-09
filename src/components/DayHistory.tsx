@@ -29,7 +29,7 @@ function entryLabel(habit: Habit, history: History, day: string): string {
 }
 
 /**
- * The read-out under a heatmap for one tapped day: every habit that was due,
+ * The read-out for one tapped heatmap day, shown in a bottom sheet: every habit that was due,
  * and what its entry says. Past entries are facts, so this is read-only —
  * editing history would quietly rewrite streaks the user already banked.
  */
@@ -52,9 +52,15 @@ export function DayHistory({ day, habits, history }: Props) {
           const logged = label !== 'Not logged';
           return (
             <View key={habit.id} style={[styles.row, index === 0 && styles.rowFirst]}>
-              <View
-                style={[styles.dot, { backgroundColor: resolveHabitColor(habit.color, colors.accent) }]}
-              />
+              {habit.icon ? (
+                <Text allowFontScaling={false} style={styles.icon}>
+                  {habit.icon}
+                </Text>
+              ) : (
+                <View
+                  style={[styles.dot, { backgroundColor: resolveHabitColor(habit.color, colors.accent) }]}
+                />
+              )}
               <Text numberOfLines={1} style={styles.name}>
                 {habit.name}
               </Text>
@@ -69,10 +75,7 @@ export function DayHistory({ day, habits, history }: Props) {
 
 const useStyles = themedStyles(({ colors }) => ({
   panel: {
-    marginTop: 14,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.divider,
+    paddingTop: 2,
   },
   emptyText: {
     marginTop: 8,
@@ -89,6 +92,10 @@ const useStyles = themedStyles(({ colors }) => ({
   },
   rowFirst: {
     marginTop: 10,
+  },
+  icon: {
+    fontSize: 14,
+    lineHeight: 17,
   },
   dot: {
     width: 9,

@@ -7,7 +7,7 @@ export const DATABASE_NAME = 'habito.db';
  * own `user_version` pragma tracks where a given install has got to, so an
  * upgrade never re-runs a migration it has already applied.
  */
-const LATEST_VERSION = 2;
+const LATEST_VERSION = 3;
 
 export async function migrate(db: SQLiteDatabase): Promise<void> {
   // WAL keeps reads from blocking the write that happens on every check-in.
@@ -62,6 +62,11 @@ export async function migrate(db: SQLiteDatabase): Promise<void> {
     // selectable; those habits were never an explicit choice, so they now
     // follow the app accent (the 'accent' sentinel — see theme/tokens.ts).
     await db.execAsync(`UPDATE habits SET color = 'accent' WHERE color = '#72d7f0'`);
+  }
+
+  if (version < 3) {
+    // Habits gained an optional emoji icon; existing rows keep the plain tile.
+    await db.execAsync(`ALTER TABLE habits ADD COLUMN icon TEXT`);
   }
 
   await db.execAsync(`PRAGMA user_version = ${LATEST_VERSION}`);

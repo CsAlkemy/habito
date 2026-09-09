@@ -12,6 +12,7 @@ type HabitRow = {
   name: string;
   kind: MilestoneKind;
   color: string;
+  icon: string | null;
   unit: string | null;
   target: number | null;
   goal: string | null;
@@ -44,6 +45,7 @@ function toHabit(row: HabitRow): Habit {
     name: row.name,
     kind: row.kind,
     color: row.color,
+    icon: opt(row.icon),
     unit: opt(row.unit),
     target: opt(row.target),
     goal: opt(row.goal),
@@ -80,13 +82,14 @@ export async function loadAllHabits(db: SQLiteDatabase): Promise<Habit[]> {
 export async function insertHabit(db: SQLiteDatabase, habit: Habit): Promise<void> {
   await db.runAsync(
     `INSERT INTO habits
-       (id, name, kind, color, unit, target, goal, schedule, reminder,
+       (id, name, kind, color, icon, unit, target, goal, schedule, reminder,
         milestone_noun, created_at, archived_at, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     habit.id,
     habit.name,
     habit.kind,
     habit.color,
+    habit.icon ?? null,
     habit.unit ?? null,
     habit.target ?? null,
     habit.goal ?? null,
@@ -105,15 +108,16 @@ export async function insertHabit(db: SQLiteDatabase, habit: Habit): Promise<voi
  * that promise.
  */
 export type HabitEdit = Pick<Habit, 'name' | 'color' | 'schedule'> &
-  Partial<Pick<Habit, 'unit' | 'target' | 'goal' | 'reminder'>>;
+  Partial<Pick<Habit, 'icon' | 'unit' | 'target' | 'goal' | 'reminder'>>;
 
 export async function updateHabit(db: SQLiteDatabase, id: string, edit: HabitEdit): Promise<void> {
   await db.runAsync(
     `UPDATE habits
-        SET name = ?, color = ?, schedule = ?, unit = ?, target = ?, goal = ?, reminder = ?
+        SET name = ?, color = ?, icon = ?, schedule = ?, unit = ?, target = ?, goal = ?, reminder = ?
       WHERE id = ?`,
     edit.name,
     edit.color,
+    edit.icon ?? null,
     edit.schedule,
     edit.unit ?? null,
     edit.target ?? null,
@@ -218,12 +222,13 @@ export async function importBackup(
     for (const habit of habits) {
       await db.runAsync(
         `INSERT INTO habits
-           (id, name, kind, color, unit, target, goal, schedule, reminder,
+           (id, name, kind, color, icon, unit, target, goal, schedule, reminder,
             milestone_noun, created_at, archived_at, sort_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (id) DO UPDATE SET
            name           = excluded.name,
            color          = excluded.color,
+           icon           = excluded.icon,
            unit           = excluded.unit,
            target         = excluded.target,
            goal           = excluded.goal,
@@ -236,6 +241,7 @@ export async function importBackup(
         habit.name,
         habit.kind,
         habit.color,
+        habit.icon ?? null,
         habit.unit ?? null,
         habit.target ?? null,
         habit.goal ?? null,
