@@ -45,11 +45,18 @@
         "expo-notifications",
         {
           "color": "#72d7f0",
-          "defaultChannel": "reminders"
+          "defaultChannel": "reminders",
+          "sounds": [
+            "./assets/sounds/chime.wav",
+            "./assets/sounds/bloom.wav",
+            "./assets/sounds/drop.wav",
+            "./assets/sounds/pulse.wav"
+          ]
         }
       ],
       "@react-native-community/datetimepicker",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio"
     ],
     "runtimeVersion": {
       "policy": "appVersion"

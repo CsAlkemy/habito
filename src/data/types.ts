@@ -80,6 +80,9 @@ export type Badge = {
 
 export type NotificationSettingId = 'reminders' | 'recap';
 
+/** Which tone a habit reminder plays. Options are listed in `catalog.ts`. */
+export type ReminderSoundId = 'default' | 'chime' | 'bloom' | 'drop' | 'pulse';
+
 export type NotificationSetting = {
   id: NotificationSettingId;
   name: string;

@@ -7,6 +7,7 @@
     "@expo/metro-runtime": "~57.0.12",
     "@react-native-community/datetimepicker": "9.1.0",
     "expo": "~57.0.13",
+    "expo-audio": "~57.0.4",
     "expo-blur": "~57.0.2",
     "expo-constants": "~57.0.11",
     "expo-document-picker": "~57.0.1",

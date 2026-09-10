@@ -2,11 +2,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
+import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { AccentTile } from '@/components/AccentTile';
 import { InfoNote } from '@/components/InfoNote';
 import { Screen } from '@/components/Screen';
+import { SoundPicker } from '@/components/SoundPicker';
 import { Toggle } from '@/components/Toggle';
+import { reminderSoundDef } from '@/data/catalog';
 import { useProfile, useStore } from '@/data/store';
 import type { Badge } from '@/data/types';
 import { dayKey } from '@/lib/date';
@@ -48,6 +51,8 @@ export default function You() {
   const {
     notifications,
     toggleNotification,
+    reminderSound,
+    setReminderSound,
     habits,
     eraseAll,
     exportData,
@@ -61,6 +66,8 @@ export default function You() {
   const { text, colors } = useTheme();
   const styles = useStyles();
   const earned = badges.filter((b) => b.earned).length;
+  const [pickingSound, setPickingSound] = useState(false);
+  const remindersOn = notifications.some((n) => n.id === 'reminders' && n.enabled);
 
   const onExport = async () => {
     try {
@@ -257,7 +264,7 @@ export default function You() {
                 onPress={destination ? () => router.push(destination) : undefined}
                 style={({ pressed }) => [
                   styles.settingRow,
-                  index < notifications.length - 1 && styles.settingDivider,
+                  styles.settingDivider,
                   pressed && styles.pressed,
                 ]}
               >
@@ -273,6 +280,27 @@ export default function You() {
               </Pressable>
             );
           })}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Reminder sound, ${reminderSoundDef(reminderSound).name}`}
+            onPress={() => setPickingSound(true)}
+            style={({ pressed }) => [
+              styles.settingRow,
+              pressed && styles.pressed,
+              !remindersOn && styles.settingDimmed,
+            ]}
+          >
+            <View style={styles.settingText}>
+              <Text style={styles.settingName}>Reminder sound</Text>
+              <Text style={styles.settingSub}>
+                {remindersOn ? 'The tone every habit reminder plays' : 'Turn on habit reminders to hear it'}
+              </Text>
+            </View>
+            <View style={styles.valuePill}>
+              <Text style={styles.valuePillLabel}>{reminderSoundDef(reminderSound).name}</Text>
+              <Text style={styles.valuePillChevron}>›</Text>
+            </View>
+          </Pressable>
         </View>
 
         <View style={styles.budget}>
@@ -321,6 +349,13 @@ export default function You() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <SoundPicker
+        visible={pickingSound}
+        value={reminderSound}
+        onChange={setReminderSound}
+        onDismiss={() => setPickingSound(false)}
+      />
     </Screen>
   );
 }
@@ -438,6 +473,31 @@ const useStyles = themedStyles(({ colors }) => ({
   },
   settingText: {
     flex: 1,
+  },
+  settingDimmed: {
+    opacity: 0.55,
+  },
+  valuePill: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+    backgroundColor: colors.ground,
+    borderRadius: radius.full,
+    paddingVertical: 7,
+    paddingLeft: 12,
+    paddingRight: 10,
+  },
+  valuePillLabel: {
+    fontFamily: font.semibold,
+    fontSize: 12,
+    lineHeight: 14,
+    color: colors.text,
+  },
+  valuePillChevron: {
+    fontFamily: font.medium,
+    fontSize: 16,
+    lineHeight: 16,
+    color: colors.textDim,
   },
   settingName: {
     fontFamily: font.semibold,

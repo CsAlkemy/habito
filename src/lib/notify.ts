@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import type { SQLiteDatabase } from 'expo-sqlite';
-import { NOTIFICATION_DEFS, RECAP_NOTIFICATION } from '@/data/catalog';
+import { NOTIFICATION_DEFS, RECAP_NOTIFICATION, reminderSoundDef } from '@/data/catalog';
 import { loadHabits, loadSettings } from '@/db/repo';
 
 /**
@@ -50,14 +50,39 @@ export async function ensurePermissions(): Promise<boolean> {
   return asked.granted;
 }
 
-async function ensureAndroidChannel(): Promise<void> {
+/** The channel the config plugin registers as default; plays the system tone. */
+const DEFAULT_CHANNEL = 'reminders';
+
+/**
+ * Android fixes a channel's sound at creation, so each tone gets a channel of
+ * its own rather than trying to update one. Old channels linger in the system
+ * settings, but a handful of them is harmless.
+ */
+function reminderChannelId(sound: ReturnType<typeof reminderSoundDef>): string {
+  return sound.file ? `reminders-${sound.id}` : DEFAULT_CHANNEL;
+}
+
+async function ensureAndroidChannels(
+  sound: ReturnType<typeof reminderSoundDef>,
+): Promise<void> {
   if (!Notifications || Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync('reminders', {
-    name: 'Habit reminders',
+  const base = {
     importance: Notifications.AndroidImportance.DEFAULT,
     vibrationPattern: [0, 200],
     lightColor: '#72d7f0',
+  };
+  // The default channel always exists: the weekly recap uses it.
+  await Notifications.setNotificationChannelAsync(DEFAULT_CHANNEL, {
+    ...base,
+    name: 'Habit reminders',
   });
+  if (sound.file) {
+    await Notifications.setNotificationChannelAsync(reminderChannelId(sound), {
+      ...base,
+      name: `Habit reminders · ${sound.name}`,
+      sound: sound.file,
+    });
+  }
 }
 
 /** 'HH:MM' -> {hour, minute}, or null when the string is not a valid time. */
@@ -140,9 +165,11 @@ export async function syncReminders(db: SQLiteDatabase): Promise<void> {
   if (!wantsReminders && !wantsRecap) return;
 
   if (!(await ensurePermissions())) return;
-  await ensureAndroidChannel();
+  const sound = reminderSoundDef(settings.reminderSound);
+  await ensureAndroidChannels(sound);
 
   if (wantsReminders) {
+    const channelId = reminderChannelId(sound);
     for (const habit of await loadHabits(db)) {
       for (const at of parseReminderTimes(habit.reminder)) {
         await Notifications.scheduleNotificationAsync({
@@ -150,12 +177,15 @@ export async function syncReminders(db: SQLiteDatabase): Promise<void> {
             title: habit.name,
             body: habit.goal ?? 'Time to check in.',
             data: { habitId: habit.id },
-            ...(Platform.OS === 'android' ? { channelId: 'reminders' } : {}),
+            // iOS reads the tone here; Android 8+ reads it from the channel.
+            sound: sound.file ?? 'default',
+            ...(Platform.OS === 'android' ? { channelId } : {}),
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DAILY,
             hour: at.hour,
             minute: at.minute,
+            ...(Platform.OS === 'android' ? { channelId } : {}),
           },
         });
       }
@@ -168,7 +198,7 @@ export async function syncReminders(db: SQLiteDatabase): Promise<void> {
         title: 'Your week in review',
         body: 'See how the last seven days went.',
         data: { route: '/recap' },
-        ...(Platform.OS === 'android' ? { channelId: 'reminders' } : {}),
+        ...(Platform.OS === 'android' ? { channelId: DEFAULT_CHANNEL } : {}),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.WEEKLY,

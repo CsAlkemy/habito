@@ -1,4 +1,4 @@
-import type { BadgeId, NotificationSettingId } from './types';
+import type { BadgeId, NotificationSettingId, ReminderSoundId } from './types';
 
 /**
  * The genuinely static half of what used to live in `seed.ts`: the things the
@@ -42,6 +42,31 @@ export const NOTIFICATION_DEFS: {
   },
   { id: 'recap', name: 'Weekly recap', sub: 'Sunday, 19:00', defaultOn: true },
 ];
+
+/**
+ * The tones a reminder can play. `file` is the base name the config plugin in
+ * app.json bakes into the native project; expo-notifications wants exactly that
+ * name at schedule time. `null` means the platform's own alert sound.
+ */
+export const REMINDER_SOUNDS: {
+  id: ReminderSoundId;
+  name: string;
+  sub: string;
+  file: string | null;
+}[] = [
+  { id: 'default', name: 'Default', sub: 'Your phone’s standard alert', file: null },
+  { id: 'chime', name: 'Chime', sub: 'Two soft bells', file: 'chime.wav' },
+  { id: 'bloom', name: 'Bloom', sub: 'A rising three-note arpeggio', file: 'bloom.wav' },
+  { id: 'drop', name: 'Drop', sub: 'A gentle falling pair', file: 'drop.wav' },
+  { id: 'pulse', name: 'Pulse', sub: 'Three quick taps', file: 'pulse.wav' },
+];
+
+export const DEFAULT_REMINDER_SOUND: ReminderSoundId = 'default';
+
+/** The option for a stored id, falling back to the default for unknown values. */
+export function reminderSoundDef(id: string | undefined) {
+  return REMINDER_SOUNDS.find((s) => s.id === id) ?? REMINDER_SOUNDS[0];
+}
 
 /** Sunday evening, matching the copy on the recap row. */
 export const RECAP_NOTIFICATION = { weekday: 1, hour: 19, minute: 0 };
