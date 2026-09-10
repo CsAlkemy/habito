@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, View, useWindowDimensions } from 'react-native';
+import {
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import type { DimensionValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { themedStyles } from '@/theme';
@@ -10,6 +19,8 @@ type Props = {
   onDismiss: () => void;
   /** how much of the screen the sheet may take; content beyond that scrolls */
   maxHeight?: DimensionValue;
+  /** lift the sheet above the keyboard when it holds a text field */
+  avoidKeyboard?: boolean;
   children: React.ReactNode;
 };
 
@@ -19,7 +30,13 @@ type Props = {
  * Instead the modal mounts instantly and transparent, and we drive the scrim
  * fade and the sheet's spring ourselves.
  */
-export function BottomSheet({ visible, onDismiss, maxHeight = '70%', children }: Props) {
+export function BottomSheet({
+  visible,
+  onDismiss,
+  maxHeight = '70%',
+  avoidKeyboard = false,
+  children,
+}: Props) {
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
   const styles = useStyles();
@@ -64,7 +81,12 @@ export function BottomSheet({ visible, onDismiss, maxHeight = '70%', children }:
       navigationBarTranslucent
       onRequestClose={onDismiss}
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView
+        style={styles.root}
+        enabled={avoidKeyboard}
+        // Android's Modal resizes for the keyboard on its own; iOS needs the nudge.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <Animated.View style={[styles.backdrop, { opacity: progress }]}>
           <Pressable
             accessibilityRole="button"
@@ -87,7 +109,7 @@ export function BottomSheet({ visible, onDismiss, maxHeight = '70%', children }:
           <View style={styles.grabber} />
           {children}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

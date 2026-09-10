@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { AccentTile } from '@/components/AccentTile';
+import { ColorPicker, HUE_STOPS } from '@/components/ColorPicker';
 import { InfoNote } from '@/components/InfoNote';
 import { Screen } from '@/components/Screen';
 import { SoundPicker } from '@/components/SoundPicker';
@@ -13,6 +15,7 @@ import { reminderSoundDef } from '@/data/catalog';
 import { useProfile, useStore } from '@/data/store';
 import type { Badge } from '@/data/types';
 import { dayKey } from '@/lib/date';
+import { WIDGET_STYLES } from '@/lib/widget';
 import { themedStyles, useTheme } from '@/theme';
 import { ACCENT_OPTIONS, font, radius, tracking, type ThemeMode } from '@/theme/tokens';
 
@@ -53,6 +56,7 @@ export default function You() {
     toggleNotification,
     reminderSound,
     setReminderSound,
+    widgetConfig,
     habits,
     eraseAll,
     exportData,
@@ -67,6 +71,8 @@ export default function You() {
   const styles = useStyles();
   const earned = badges.filter((b) => b.earned).length;
   const [pickingSound, setPickingSound] = useState(false);
+  const [pickingAccent, setPickingAccent] = useState(false);
+  const customAccent = (ACCENT_OPTIONS as readonly string[]).includes(accent) ? null : accent;
   const remindersOn = notifications.some((n) => n.id === 'reminders' && n.enabled);
 
   const onExport = async () => {
@@ -248,8 +254,49 @@ export default function You() {
                   />
                 );
               })}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected: customAccent !== null }}
+                accessibilityLabel={
+                  customAccent ? `Custom accent colour ${customAccent}, tap to change` : 'Custom accent colour'
+                }
+                onPress={() => setPickingAccent(true)}
+                style={[styles.swatch, customAccent !== null && styles.swatchActive]}
+              >
+                {customAccent ? (
+                  <View style={[styles.swatchFill, { backgroundColor: customAccent }]} />
+                ) : (
+                  <LinearGradient
+                    colors={HUE_STOPS}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.swatchFill}
+                  />
+                )}
+              </Pressable>
             </View>
           </View>
+        </View>
+
+        <Text style={[text.label, styles.groupLabel]}>Home screen</Text>
+        <View style={styles.settings}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Widget, ${WIDGET_STYLES.find((s) => s.id === widgetConfig.style)?.name}`}
+            onPress={() => router.push('/widget')}
+            style={({ pressed }) => [styles.settingRow, pressed && styles.pressed]}
+          >
+            <View style={styles.settingText}>
+              <Text style={styles.settingName}>Widget</Text>
+              <Text style={styles.settingSub}>Design what your home-screen widget shows</Text>
+            </View>
+            <View style={styles.valuePill}>
+              <Text style={styles.valuePillLabel}>
+                {WIDGET_STYLES.find((s) => s.id === widgetConfig.style)?.name}
+              </Text>
+              <Text style={styles.valuePillChevron}>›</Text>
+            </View>
+          </Pressable>
         </View>
 
         <Text style={[text.label, styles.groupLabel]}>Notifications</Text>
@@ -355,6 +402,13 @@ export default function You() {
         value={reminderSound}
         onChange={setReminderSound}
         onDismiss={() => setPickingSound(false)}
+      />
+      <ColorPicker
+        visible={pickingAccent}
+        title="Accent colour"
+        value={accent}
+        onChange={setAccent}
+        onDismiss={() => setPickingAccent(false)}
       />
     </Screen>
   );
@@ -548,6 +602,10 @@ const useStyles = themedStyles(({ colors }) => ({
   swatchActive: {
     borderWidth: 2.5,
     borderColor: colors.text,
+  },
+  swatchFill: {
+    flex: 1,
+    borderRadius: radius.full,
   },
   budget: {
     marginTop: 10,

@@ -29,6 +29,7 @@ Each design option maps to one route.
 | 2i | Progress overview · all habits | `app/(tabs)/progress.tsx` |
 | 2j | Lock screen · reminder, live activity, widget | `app/lock-screen.tsx` |
 | 2k | You · level, badges, notification budget | `app/(tabs)/you.tsx` |
+| — | Widget editor · design the home-screen widget | `app/widget.tsx` |
 
 Routes that aren't tabs are reached the way the product implies: tap a habit to
 check in, long-press to skip, tap the milestone banner for the habit detail. The

@@ -78,6 +78,7 @@ function App() {
         <Stack.Screen name="habit/new" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="habit/[id]" />
         <Stack.Screen name="milestone" options={{ animation: 'fade' }} />
+        <Stack.Screen name="widget" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="recap" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="lock-screen" options={{ animation: 'fade' }} />
       </Stack>

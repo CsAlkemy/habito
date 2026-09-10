@@ -1,4 +1,4 @@
-import { mix, alpha } from './color';
+import { mix, alpha, luminance } from './color';
 
 /**
  * Design tokens ported from `Habit Tracker - Screens.dc.html`.
@@ -103,15 +103,26 @@ export function makeTheme(scheme: Scheme, accent: string) {
   const neutrals = dark ? DARK_NEUTRALS : LIGHT_NEUTRALS;
   const picked = HAND_PICKED[accent];
 
-  /** text and glyphs sitting on an accent surface */
-  const accentInk = picked?.ink ?? mix(22, '#000000', accent);
+  /**
+   * The presets are all pastels, so ink on an accent surface is dark. A custom
+   * accent from the picker can be deep, in which case the ink flips to light
+   * and the accent-as-text reads are nudged towards the ground's opposite.
+   */
+  const deep = luminance(accent) < 0.18;
+  const accentInk = picked?.ink ?? (deep ? mix(88, accent, '#ffffff') : mix(22, '#000000', accent));
 
   const colors = {
     ...neutrals,
 
     accent,
     /** accent used as text on the ground — darkened in light for contrast */
-    accentText: dark ? accent : mix(35, accent, '#000000'),
+    accentText: dark
+      ? deep
+        ? mix(45, accent, '#ffffff')
+        : accent
+      : deep
+        ? accent
+        : mix(35, accent, '#000000'),
     accentInk,
     accentInkMuted: alpha(accentInk, 0.75),
     /** the quiet informational panel ("your streak pauses here, not ends") */

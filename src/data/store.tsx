@@ -23,7 +23,13 @@ import type {
 import { addDays, dayKey, milestoneFor } from '@/lib/date';
 import { earnedBadgeIds, habitStats, levelFor, totalXp } from '@/lib/stats';
 import { syncReminders } from '@/lib/notify';
-import { writeWidgetSnapshot } from '@/lib/widget';
+import {
+  DEFAULT_WIDGET_CONFIG,
+  parseWidgetConfig,
+  WIDGET_CONFIG_KEY,
+  type WidgetConfig,
+  writeWidgetSnapshot,
+} from '@/lib/widget';
 import { DEFAULT_ACCENT, type ThemeMode } from '@/theme/tokens';
 import type { HabitEdit } from '@/db/repo';
 import { buildBackup, parseBackup } from '@/lib/backup';
@@ -75,6 +81,8 @@ type State = {
   notifications: NotificationSetting[];
   /** the tone habit reminders play; see `REMINDER_SOUNDS` */
   reminderSound: ReminderSoundId;
+  /** what the home-screen widget shows; designed in `app/widget.tsx` */
+  widgetConfig: WidgetConfig;
   onboarded: boolean;
   profileName: string;
   /** appearance: follow the OS, or force one scheme */
@@ -108,6 +116,7 @@ type Actions = {
   importData: (json: string) => Promise<{ habits: number; entries: number }>;
   toggleNotification: (id: NotificationSettingId) => void;
   setReminderSound: (id: ReminderSoundId) => void;
+  setWidgetConfig: (config: WidgetConfig) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setAccent: (accent: string) => void;
   completeOnboarding: (name: string, first: NewHabit) => void;
@@ -124,6 +133,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<History>({});
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [reminderSound, setReminderSoundState] = useState<ReminderSoundId>(DEFAULT_REMINDER_SOUND);
+  const [widgetConfig, setWidgetConfigState] = useState<WidgetConfig>(DEFAULT_WIDGET_CONFIG);
   const [onboarded, setOnboarded] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
@@ -164,6 +174,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const storedMode = settings[KEY_THEME_MODE] as ThemeMode | undefined;
       if (storedMode && THEME_MODES.includes(storedMode)) setThemeModeState(storedMode);
       if (settings[KEY_ACCENT]) setAccentState(settings[KEY_ACCENT]);
+      setWidgetConfigState(parseWidgetConfig(settings[WIDGET_CONFIG_KEY]));
       const storedSound = settings[KEY_REMINDER_SOUND];
       if (storedSound && REMINDER_SOUNDS.some((snd) => snd.id === storedSound)) {
         setReminderSoundState(storedSound as ReminderSoundId);
@@ -365,6 +376,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [db],
   );
 
+  const setWidgetConfig = useCallback<Actions['setWidgetConfig']>(
+    (config) => {
+      setWidgetConfigState(config);
+      saveSetting(db, WIDGET_CONFIG_KEY, JSON.stringify(config)).catch((err) =>
+        console.error('[habito] setWidgetConfig failed', err),
+      );
+    },
+    [db],
+  );
+
   const moveHabit = useCallback<Actions['moveHabit']>(
     (id, delta) => {
       setHabits((prev) => {
@@ -455,6 +476,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setThemeModeState('system');
     setAccentState(DEFAULT_ACCENT);
     setReminderSoundState(DEFAULT_REMINDER_SOUND);
+    setWidgetConfigState(DEFAULT_WIDGET_CONFIG);
     dbErase(db)
       .then(() => syncReminders(db))
       .catch((err) => console.error('[habito] eraseAll failed', err));
@@ -477,8 +499,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // writer later is a change to `writeWidgetSnapshot` and nothing else.
   useEffect(() => {
     if (!hydrated) return;
-    writeWidgetSnapshot(db, habits, history, todayKey);
-  }, [db, hydrated, habits, history, todayKey]);
+    writeWidgetSnapshot(db, habits, history, todayKey, widgetConfig);
+  }, [db, hydrated, habits, history, todayKey, widgetConfig]);
 
   const value = useMemo(
     () => ({
@@ -487,6 +509,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       history,
       notifications,
       reminderSound,
+      widgetConfig,
       onboarded,
       profileName,
       themeMode,
@@ -506,6 +529,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       importData,
       toggleNotification,
       setReminderSound,
+      setWidgetConfig,
       setThemeMode,
       setAccent,
       completeOnboarding,
@@ -517,6 +541,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       history,
       notifications,
       reminderSound,
+      widgetConfig,
       onboarded,
       profileName,
       themeMode,
@@ -536,6 +561,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       importData,
       toggleNotification,
       setReminderSound,
+      setWidgetConfig,
       setThemeMode,
       setAccent,
       completeOnboarding,

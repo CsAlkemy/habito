@@ -1,12 +1,16 @@
+import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
+import { ColorPicker, HUE_STOPS } from './ColorPicker';
 import { themedStyles, useTheme } from '@/theme';
 import { ACCENT_FOLLOW, ACCENT_OPTIONS, resolveHabitColor } from '@/theme/tokens';
 
 /**
  * The habit colour row from screen 2e. The first choice follows the app accent
  * (stored as a sentinel, so re-theming re-tints the habit); the rest are
- * literal hexes that stay put.
+ * literal hexes that stay put. The last swatch opens the free picker, and
+ * shows whatever custom colour it produced.
  */
 
 type Props = {
@@ -18,12 +22,14 @@ type Props = {
 export function ColorSwatches({ value, onChange, style }: Props) {
   const { colors } = useTheme();
   const styles = useStyles();
+  const [picking, setPicking] = useState(false);
 
   const swatches = [
     ACCENT_FOLLOW,
     ...ACCENT_OPTIONS.filter((option) => option !== colors.accent),
     '#9A9AA2',
   ];
+  const custom = swatches.includes(value) ? null : value;
 
   return (
     <View style={[styles.swatches, style]}>
@@ -45,6 +51,33 @@ export function ColorSwatches({ value, onChange, style }: Props) {
           </Pressable>
         );
       })}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: custom !== null }}
+        accessibilityLabel={custom ? `Custom colour ${custom}, tap to change` : 'Custom colour'}
+        onPress={() => setPicking(true)}
+        style={[styles.swatchRing, custom !== null && { borderColor: custom, borderWidth: 1.5 }]}
+      >
+        {custom ? (
+          <View style={[styles.swatch, { backgroundColor: custom }]} />
+        ) : (
+          <LinearGradient
+            colors={HUE_STOPS}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.swatch}
+          />
+        )}
+      </Pressable>
+
+      <ColorPicker
+        visible={picking}
+        title="Habit colour"
+        value={resolveHabitColor(value, colors.accent)}
+        onChange={onChange}
+        onDismiss={() => setPicking(false)}
+      />
     </View>
   );
 }

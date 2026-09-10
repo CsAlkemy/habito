@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { AccentTile } from '@/components/AccentTile';
 import { ProgressRing } from '@/components/ProgressRing';
 import { RadialBackdrop } from '@/components/RadialBackdrop';
 import { Screen } from '@/components/Screen';
+import { WidgetPreview } from '@/components/WidgetPreview';
 import { useAllStats, useStore, useTodayProgress } from '@/data/store';
 import { clockTime, longDate, nextMilestone } from '@/lib/date';
 import { ThemeScope, themedStyles, useTheme } from '@/theme';
@@ -32,7 +32,7 @@ export default function LockScreen() {
 
 function LockScreenPreview() {
   const router = useRouter();
-  const { habits, today } = useStore();
+  const { habits, today, widgetConfig } = useStore();
   const stats = useAllStats();
   const { done, total, ratio } = useTodayProgress();
   const { colors } = useTheme();
@@ -120,54 +120,9 @@ function LockScreenPreview() {
 
       <View style={styles.spacer} />
 
-      {/* Home-screen widgets */}
+      {/* Home-screen widget, as designed in You → Home screen → Widget */}
       <View style={styles.widgets}>
-        <View style={styles.listWidget}>
-          <View style={styles.widgetHead}>
-            <Text style={styles.widgetLabel}>Today</Text>
-            <Text style={styles.widgetCount}>
-              {done}/{total}
-            </Text>
-          </View>
-          <View style={styles.widgetRows}>
-            {habits.slice(0, 4).map((habit) => {
-              const complete = today[habit.id]?.status === 'done';
-              return (
-                <View key={habit.id} style={styles.widgetRow}>
-                  <View
-                    style={[
-                      styles.widgetTile,
-                      complete
-                        ? { backgroundColor: colors.accent }
-                        : { borderWidth: 1.5, borderColor: colors.ring },
-                    ]}
-                  />
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.widgetName,
-                      { color: complete ? colors.textDim : colors.text },
-                    ]}
-                  >
-                    {habit.name}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        </View>
-
-        {streakHabit && (
-          <AccentTile r={radius.panel} style={styles.streakWidget} flat>
-            <View style={styles.streakInner}>
-              <Text style={styles.streakNumber}>{streak}</Text>
-              <View>
-                <Text style={styles.streakLabel}>Day streak</Text>
-                <Text style={styles.streakHabit}>{streakHabit.name}</Text>
-              </View>
-            </View>
-          </AccentTile>
-        )}
+        <WidgetPreview config={widgetConfig} />
       </View>
     </Screen>
   );
@@ -308,86 +263,6 @@ const useStyles = themedStyles(({ colors }) => ({
     minHeight: 16,
   },
   widgets: {
-    flexDirection: 'row' as const,
-    alignItems: 'flex-end' as const,
-    gap: 10,
-  },
-  listWidget: {
-    width: 166,
-    height: 166,
-    borderRadius: radius.chrome,
-    backgroundColor: colors.elevated,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: 15,
-  },
-  widgetHead: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-  },
-  widgetLabel: {
-    fontFamily: font.semibold,
-    fontSize: 10,
-    lineHeight: 12,
-    letterSpacing: tracking(0.14, 10),
-    color: colors.accent,
-    textTransform: 'uppercase' as const,
-  },
-  widgetCount: {
-    fontFamily: font.semibold,
-    fontSize: 10.5,
-    lineHeight: 12,
-    color: colors.textSub,
-  },
-  widgetRows: {
-    marginTop: 12,
-    gap: 10,
-  },
-  widgetRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 9,
-  },
-  widgetTile: {
-    width: 17,
-    height: 17,
-    borderRadius: 6,
-  },
-  widgetName: {
-    flex: 1,
-    fontFamily: font.medium,
-    fontSize: 12.5,
-    lineHeight: 15,
-  },
-  streakWidget: {
-    flex: 1,
-    height: 76,
-  },
-  streakInner: {
-    flex: 1,
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    gap: 11,
-    padding: 14,
-  },
-  streakNumber: {
-    fontFamily: font.semibold,
-    fontSize: 30,
-    lineHeight: 32,
-    color: colors.accentInk,
-  },
-  streakLabel: {
-    fontFamily: font.semibold,
-    fontSize: 12,
-    lineHeight: 16,
-    color: colors.accentInk,
-    textTransform: 'uppercase' as const,
-  },
-  streakHabit: {
-    fontFamily: font.medium,
-    fontSize: 12,
-    lineHeight: 16,
-    color: colors.accentInkMuted,
+    alignItems: 'flex-start' as const,
   },
 }));
