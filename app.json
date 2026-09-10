@@ -56,10 +56,27 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-sharing",
-      "expo-audio"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "runtimeVersion": {
       "policy": "appVersion"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "03cf6145-1d8c-4a6d-b2ea-5a4eb19793f3"
+      }
+    },
+    "owner": "devsnio",
+    "updates": {
+      "url": "https://u.expo.dev/03cf6145-1d8c-4a6d-b2ea-5a4eb19793f3"
     }
   }
 }
