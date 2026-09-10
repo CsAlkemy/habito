@@ -5,6 +5,7 @@ import { BottomSheet } from "./BottomSheet";
 import { NavHeader } from "./NavHeader";
 import { REMINDER_SOUNDS } from "@/data/catalog";
 import type { ReminderSoundId } from "@/data/types";
+import { CUSTOM_SOUNDS_AVAILABLE } from "@/lib/notify";
 import { SOUND_ASSETS } from "@/lib/sounds";
 import { themedStyles, useTheme } from "@/theme";
 import { font, radius } from "@/theme/tokens";
@@ -77,6 +78,12 @@ export function SoundPicker({ visible, value, onChange, onDismiss }: Props) {
         <Text style={[text.bodySm, styles.blurb]}>
           Tap one to hear it. Every habit reminder uses it.
         </Text>
+        {!CUSTOM_SOUNDS_AVAILABLE && (
+          <Text style={[text.bodySm, styles.blurb, { color: colors.textSub }]}>
+            Expo Go can’t bundle custom tones, so reminders here play the default. Your choice is
+            saved and takes effect in a development or release build.
+          </Text>
+        )}
 
         <View style={styles.list}>
           {REMINDER_SOUNDS.map((sound, index) => {

@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import type { ColorValue, GestureResponderEvent, LayoutChangeEvent } from 'react-native';
 import { BottomSheet } from './BottomSheet';
@@ -106,11 +106,12 @@ export function ColorPicker({
           <Text style={styles.hexHash}>#</Text>
           <TextInput
             value={hexText.replace(/^#/, '')}
-            onChangeText={(typed) => onHexText(typed)}
+            // No maxLength: a pasted "#e0607a" is seven characters and would be
+            // cut to five. Strip the hash and cap it here instead.
+            onChangeText={(typed) => onHexText(typed.replace(/#/g, '').slice(0, 6))}
             onBlur={() => setHexText(draft.hex)}
             autoCapitalize="none"
             autoCorrect={false}
-            maxLength={6}
             accessibilityLabel="Hex colour"
             placeholder="72d7f0"
             placeholderTextColor={colors.textDim}
@@ -179,15 +180,30 @@ type SliderProps = {
 /**
  * A gradient track with a draggable thumb. Built on the responder system
  * rather than a gesture library so the same code runs on the web harness.
+ *
+ * Position comes from `pageX` against the track's measured window offset, not
+ * `locationX`: on Android the latter is relative to whichever view is under
+ * the finger, so a drag that strays off the track makes the thumb jump.
  */
 function Slider({ label, value, max, stops, thumb, onChange }: SliderProps) {
   const { colors } = useTheme();
   const styles = useStyles();
   const [width, setWidth] = useState(0);
+  const track = useRef<View>(null);
+  const originX = useRef<number | null>(null);
+
+  const measure = () => {
+    track.current?.measureInWindow((x, _y, w) => {
+      originX.current = x;
+      if (w) setWidth(w);
+    });
+  };
 
   const fromTouch = (event: GestureResponderEvent) => {
     if (!width) return;
-    const ratio = Math.min(1, Math.max(0, event.nativeEvent.locationX / width));
+    const { pageX, locationX } = event.nativeEvent;
+    const x = originX.current === null ? locationX : pageX - originX.current;
+    const ratio = Math.min(1, Math.max(0, x / width));
     onChange(Math.round(ratio * max));
   };
   const step = (delta: number) => onChange(Math.min(max, Math.max(0, Math.round(value) + delta)));
@@ -207,11 +223,19 @@ function Slider({ label, value, max, stops, thumb, onChange }: SliderProps) {
         onAccessibilityAction={(event) =>
           step(event.nativeEvent.actionName === 'increment' ? max / 20 : -max / 20)
         }
-        onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
+        ref={track}
+        onLayout={(event: LayoutChangeEvent) => {
+          setWidth(event.nativeEvent.layout.width);
+          measure();
+        }}
         onStartShouldSetResponder={() => true}
         onMoveShouldSetResponder={() => true}
         onResponderTerminationRequest={() => false}
-        onResponderGrant={fromTouch}
+        onResponderGrant={(event) => {
+          // The sheet may have moved since layout (keyboard, spring-in).
+          measure();
+          fromTouch(event);
+        }}
         onResponderMove={fromTouch}
         style={styles.track}
       >
@@ -266,6 +290,8 @@ const useStyles = themedStyles(({ colors }) => ({
     fontSize: 16,
     color: colors.text,
     padding: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center' as const,
   },
   slider: {
     marginTop: 18,

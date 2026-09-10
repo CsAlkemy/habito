@@ -4,7 +4,6 @@ import {
   Easing,
   KeyboardAvoidingView,
   Modal,
-  Platform,
   Pressable,
   View,
   useWindowDimensions,
@@ -84,8 +83,9 @@ export function BottomSheet({
       <KeyboardAvoidingView
         style={styles.root}
         enabled={avoidKeyboard}
-        // Android's Modal resizes for the keyboard on its own; iOS needs the nudge.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        // A statusBarTranslucent Modal opts Android out of adjustResize, so
+        // neither platform moves the sheet on its own: pad on both.
+        behavior="padding"
       >
         <Animated.View style={[styles.backdrop, { opacity: progress }]}>
           <Pressable

@@ -16,6 +16,7 @@ import { useProfile, useStore } from '@/data/store';
 import type { Badge } from '@/data/types';
 import { dayKey } from '@/lib/date';
 import { WIDGET_STYLES } from '@/lib/widget';
+import { useTabBarClearance } from '@/lib/tabBar';
 import { themedStyles, useTheme } from '@/theme';
 import { ACCENT_OPTIONS, font, radius, tracking, type ThemeMode } from '@/theme/tokens';
 
@@ -69,6 +70,7 @@ export default function You() {
   const { name, xp, level, badges } = useProfile();
   const { text, colors } = useTheme();
   const styles = useStyles();
+  const clearance = useTabBarClearance();
   const earned = badges.filter((b) => b.earned).length;
   const [pickingSound, setPickingSound] = useState(false);
   const [pickingAccent, setPickingAccent] = useState(false);
@@ -147,7 +149,10 @@ export default function You() {
 
   return (
     <Screen gutter bottomExtra={0} safeBottom={false}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.body, { paddingBottom: clearance + 16 }]}
+      >
         <Text style={text.screenTitle}>{name}</Text>
 
         <AccentTile r={radius.panel} style={styles.level}>

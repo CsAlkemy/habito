@@ -8,6 +8,7 @@ import { Heatmap } from '@/components/Heatmap';
 import { Screen } from '@/components/Screen';
 import { useAllStats, useHistoryHabits, useStore } from '@/data/store';
 import { completionTrend, heatmapCells } from '@/lib/stats';
+import { useTabBarClearance } from '@/lib/tabBar';
 import { themedStyles, useTheme } from '@/theme';
 import { font, GUTTER, radius, resolveHabitColor, tracking } from '@/theme/tokens';
 
@@ -27,6 +28,7 @@ const RANGES = [
 export default function Progress() {
   const { text, heatShades, colors } = useTheme();
   const styles = useStyles();
+  const clearance = useTabBarClearance();
   const router = useRouter();
   const { habits, history, todayKey } = useStore();
   const allHabits = useHistoryHabits();
@@ -81,7 +83,10 @@ export default function Progress() {
         })}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.body}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.body, { paddingBottom: clearance + 16 }]}
+      >
         <Card r={radius.panel}>
           <Text style={text.sectionLabel}>Everything · {range.caption}</Text>
           <View style={styles.heatmap}>

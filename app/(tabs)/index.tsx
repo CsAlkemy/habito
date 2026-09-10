@@ -8,6 +8,7 @@ import { Screen } from '@/components/Screen';
 import { useAllStats, useStore, useTodayProgress } from '@/data/store';
 import type { Habit, HabitStats } from '@/data/types';
 import { greeting, nextMilestone, shortDate } from '@/lib/date';
+import { useTabBarClearance } from '@/lib/tabBar';
 import { themedStyles, useTheme } from '@/theme';
 import { font, GUTTER, radius } from '@/theme/tokens';
 
@@ -33,9 +34,10 @@ export default function Today() {
   const stats = useAllStats();
   const { done, total, ratio } = useTodayProgress();
   const upcoming = upcomingMilestone(habits, stats);
+  const clearance = useTabBarClearance();
 
   return (
-    <Screen bottomExtra={0} safeBottom={false}>
+    <Screen bottomExtra={clearance} safeBottom={false}>
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={text.eyebrow}>{shortDate()}</Text>

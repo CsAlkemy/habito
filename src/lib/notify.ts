@@ -54,6 +54,20 @@ export async function ensurePermissions(): Promise<boolean> {
 const DEFAULT_CHANNEL = 'reminders';
 
 /**
+ * The custom tones are baked into the native project by the expo-notifications
+ * config plugin, which Expo Go never runs — asking it for 'chime.wav' logs
+ * "Custom sound not found" and falls back anyway. Resolve the choice to the
+ * system sound there so the schedule stays quiet; a development build or an
+ * installed binary has the files and plays the chosen tone.
+ */
+export const CUSTOM_SOUNDS_AVAILABLE = Platform.OS !== 'web' && !isRunningInExpoGo();
+
+function effectiveSound(id: string | undefined) {
+  const chosen = reminderSoundDef(id);
+  return CUSTOM_SOUNDS_AVAILABLE ? chosen : reminderSoundDef('default');
+}
+
+/**
  * Android fixes a channel's sound at creation, so each tone gets a channel of
  * its own rather than trying to update one. Old channels linger in the system
  * settings, but a handful of them is harmless.
@@ -165,7 +179,7 @@ export async function syncReminders(db: SQLiteDatabase): Promise<void> {
   if (!wantsReminders && !wantsRecap) return;
 
   if (!(await ensurePermissions())) return;
-  const sound = reminderSoundDef(settings.reminderSound);
+  const sound = effectiveSound(settings.reminderSound);
   await ensureAndroidChannels(sound);
 
   if (wantsReminders) {
