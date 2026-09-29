@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { BottomSheet } from "./BottomSheet";
 import { NavHeader } from "./NavHeader";
+import { ProTag } from "./ProTag";
 import { REMINDER_SOUNDS } from "@/data/catalog";
+import { FREE_SOUNDS, useOpenPaywall, usePro } from "@/data/pro";
 import type { ReminderSoundId } from "@/data/types";
 import { CUSTOM_SOUNDS_AVAILABLE } from "@/lib/notify";
 import { SOUND_ASSETS } from "@/lib/sounds";
@@ -31,6 +33,9 @@ export function SoundPicker({ visible, value, onChange, onDismiss }: Props) {
   const styles = useStyles();
   const player = useAudioPlayer(null);
   const [draft, setDraft] = useState<ReminderSoundId>(value);
+  const { isPro } = usePro();
+  const openPaywall = useOpenPaywall();
+  const locked = (id: ReminderSoundId) => !isPro && !FREE_SOUNDS.includes(id);
 
   // Reopen on the saved value, not on whatever was auditioned last time.
   useEffect(() => {
@@ -44,7 +49,14 @@ export function SoundPicker({ visible, value, onChange, onDismiss }: Props) {
     setAudioModeAsync({ playsInSilentMode: true }).catch(() => {});
   }, [visible]);
 
+  // Locked tones can still be auditioned; it's saving one that asks for Pro.
+  // The sheet closes first because the paywall can't stack above a Modal.
   const save = () => {
+    if (draft !== value && locked(draft)) {
+      onDismiss();
+      openPaywall("sounds");
+      return;
+    }
     if (draft !== value) onChange(draft);
     onDismiss();
   };
@@ -93,7 +105,7 @@ export function SoundPicker({ visible, value, onChange, onDismiss }: Props) {
                 key={sound.id}
                 accessibilityRole="radio"
                 accessibilityState={{ selected, checked: selected }}
-                accessibilityLabel={`${sound.name}, ${sound.sub}`}
+                accessibilityLabel={`${sound.name}, ${sound.sub}${locked(sound.id) ? ", Pro" : ""}`}
                 onPress={() => pick(sound.id)}
                 style={({ pressed }) => [
                   styles.row,
@@ -105,6 +117,7 @@ export function SoundPicker({ visible, value, onChange, onDismiss }: Props) {
                   <Text style={styles.rowName}>{sound.name}</Text>
                   <Text style={styles.rowSub}>{sound.sub}</Text>
                 </View>
+                {locked(sound.id) && <ProTag />}
                 <View
                   style={[
                     styles.radio,

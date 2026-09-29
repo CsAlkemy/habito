@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { ColorSwatches } from '@/components/ColorSwatches';
 import { IconPicker } from '@/components/IconPicker';
@@ -7,6 +7,7 @@ import { MilestonePicker } from '@/components/MilestonePicker';
 import { NavHeader } from '@/components/NavHeader';
 import { Screen } from '@/components/Screen';
 import { TimeField } from '@/components/TimeField';
+import { FREE_HABIT_LIMIT, usePro } from '@/data/pro';
 import { useStore } from '@/data/store';
 import type { MilestoneKind, Schedule } from '@/data/types';
 import { scheduleLabel } from '@/lib/date';
@@ -36,6 +37,15 @@ export default function NewHabit() {
   const styles = useStyles();
   const existing = editId ? habits.find((h) => h.id === editId) : undefined;
   const isEdit = Boolean(existing);
+  const { isPro } = usePro();
+
+  // The Today button already routes to the paywall at the limit; this covers
+  // any other way in (a deep link, a stale back stack). Judged once on open, so
+  // saving the habit that reaches the limit doesn't bounce this form mid-exit.
+  const [overLimit] = useState(() => !editId && !isPro && habits.length >= FREE_HABIT_LIMIT);
+  useEffect(() => {
+    if (overLimit) router.replace({ pathname: '/paywall', params: { feature: 'habits' } });
+  }, [overLimit, router]);
 
   const [name, setName] = useState(existing?.name ?? '');
   const [kind, setKind] = useState<MilestoneKind>(existing?.kind ?? 'streak');

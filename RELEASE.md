@@ -44,10 +44,12 @@ submitted.
 
 ## Store submission
 
-Both stores will ask about data collection. The honest answer is the short one:
-Habito collects nothing, transmits nothing, and uses no third-party SDKs. On
-iOS that is "Data Not Collected" in App Privacy. On Google Play, the Data Safety
-form is all "No".
+Both stores will ask about data collection. Habits and check-ins never leave
+the device. The one exception is purchases: RevenueCat (the Pro subscription SDK)
+receives an anonymous app user ID and the store receipt. On iOS, App Privacy is
+"Purchases → Purchase History", used for App Functionality, not linked to
+identity, not used for tracking. On Google Play's Data Safety form, declare
+"Purchase history" as collected, for app functionality, and not shared.
 
 The one permission the app requests is notifications, and only at the moment a
 reminder is first scheduled — not at launch.
@@ -61,7 +63,49 @@ Still to be written, and not something the code can supply:
 - [ ] Support URL
 - [ ] Apple Developer and Google Play Console accounts
 
+## Habito Pro
+
+Free covers 3 habits, the week and month views, two reminder tones, the preset
+accents and export. Pro unlocks the rest. The limits live in `src/data/pro.tsx`;
+the store code is in `src/lib/purchases.ts`. Nothing a lapsed subscriber already
+has gets taken away, because the gates only stop *adding*.
+
+| Plan | Product type | List price |
+| --- | --- | --- |
+| Yearly | Auto-renewing subscription, 7-day free trial | $19.99 |
+| Monthly | Auto-renewing subscription | $2.99 |
+| Lifetime | Non-consumable | $39.99 |
+
+To go live:
+
+1. App Store Connect: create a subscription group "Habito Pro" with the two
+   subscriptions (add the free-trial introductory offer to the yearly one), plus
+   a non-consumable for lifetime. Do the same in Play Console (Monetize →
+   Products). Sign the Paid Apps agreement, because purchases fail silently
+   without it.
+2. RevenueCat: create a project, connect both apps, and import the products.
+   Make one entitlement with the identifier `pro` and attach all three
+   products. Then make a *current* offering whose packages use the built-in
+   `$rc_annual`, `$rc_monthly` and `$rc_lifetime` identifiers. The paywall
+   picks plans by package type, so custom package ids won't show up.
+3. Put the public SDK keys in EAS environment variables (or `.env.local` for
+   local builds): `EXPO_PUBLIC_REVENUECAT_IOS_KEY`,
+   `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`, and `EXPO_PUBLIC_PRIVACY_URL`.
+4. Rebuild. `react-native-purchases` is native code, so an OTA update can't
+   deliver it. Test with a Sandbox account on iOS and a licence tester on
+   Android.
+
+With no key set, the app runs in preview. The paywall shows the list prices,
+and in a debug build "buying" unlocks Pro locally without charging. A
+*Reset (dev)* pill on the You screen turns it back off. A release build with no
+key disables the buy button.
+
 ## Known gaps
+
+- **Widget styles are a Pro gate that is switched off.** `WIDGETS_LIVE` in
+  `src/data/pro.tsx` stays `false` until the native widget below ships.
+  Selling a style that can't reach the home screen would be misleading, and
+  App Review would reject it.
 
 - **Widgets are prepared but not built.** `src/lib/widget.ts` produces the exact
   payload a widget needs and the store calls it after every mutation. Adding the

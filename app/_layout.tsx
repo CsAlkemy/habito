@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ProProvider } from '@/data/pro';
 import { StoreProvider, useStore } from '@/data/store';
 import { DATABASE_NAME, migrate } from '@/db/schema';
 import { useNotificationDeepLinks } from '@/lib/notify';
@@ -26,9 +27,11 @@ export default function RootLayout() {
     <SQLiteProvider databaseName={DATABASE_NAME} onInit={migrate}>
       <SafeAreaProvider>
         <StoreProvider>
-          <ThemeProvider>
-            <App />
-          </ThemeProvider>
+          <ProProvider>
+            <ThemeProvider>
+              <App />
+            </ThemeProvider>
+          </ProProvider>
         </StoreProvider>
       </SafeAreaProvider>
     </SQLiteProvider>
@@ -81,6 +84,7 @@ function App() {
         <Stack.Screen name="widget" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="recap" options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="lock-screen" options={{ animation: 'fade' }} />
+        <Stack.Screen name="paywall" options={{ animation: 'slide_from_bottom' }} />
       </Stack>
     </>
   );

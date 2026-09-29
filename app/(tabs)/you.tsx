@@ -3,7 +3,7 @@ import { File, Paths } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AccentTile } from '@/components/AccentTile';
 import { ColorPicker, HUE_STOPS } from '@/components/ColorPicker';
@@ -12,6 +12,7 @@ import { Screen } from '@/components/Screen';
 import { SoundPicker } from '@/components/SoundPicker';
 import { Toggle } from '@/components/Toggle';
 import { reminderSoundDef } from '@/data/catalog';
+import { FREE_HABIT_LIMIT, useOpenPaywall, usePro } from '@/data/pro';
 import { useProfile, useStore } from '@/data/store';
 import type { Badge } from '@/data/types';
 import { dayKey } from '@/lib/date';
@@ -21,6 +22,8 @@ import { themedStyles, useTheme } from '@/theme';
 import { ACCENT_OPTIONS, font, radius, tracking, type ThemeMode } from '@/theme/tokens';
 
 const COLUMNS = 4;
+
+const PLAN_NAMES = { annual: 'Yearly', monthly: 'Monthly', lifetime: 'Lifetime' } as const;
 
 const THEME_CHOICES: { mode: ThemeMode; label: string }[] = [
   { mode: 'system', label: 'Auto' },
@@ -68,6 +71,8 @@ export default function You() {
     setAccent,
   } = useStore();
   const { name, xp, level, badges } = useProfile();
+  const pro = usePro();
+  const openPaywall = useOpenPaywall();
   const { text, colors } = useTheme();
   const styles = useStyles();
   const clearance = useTabBarClearance();
@@ -76,6 +81,7 @@ export default function You() {
   const [pickingAccent, setPickingAccent] = useState(false);
   const customAccent = (ACCENT_OPTIONS as readonly string[]).includes(accent) ? null : accent;
   const remindersOn = notifications.some((n) => n.id === 'reminders' && n.enabled);
+  const planName = pro.planId ? PLAN_NAMES[pro.planId] : null;
 
   const onExport = async () => {
     try {
@@ -172,6 +178,57 @@ export default function You() {
           </View>
         </AccentTile>
 
+        {pro.isPro ? (
+          <View style={[styles.settings, styles.proCard]}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingText}>
+                <Text style={styles.settingName}>Habito Pro{planName ? ` · ${planName}` : ''}</Text>
+                <Text style={styles.settingSub}>Everything unlocked. Thank you for the support.</Text>
+              </View>
+              {pro.manageUrl ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => Linking.openURL(pro.manageUrl!)}
+                  style={({ pressed }) => [styles.valuePill, pressed && styles.pressed]}
+                >
+                  <Text style={styles.valuePillLabel}>Manage</Text>
+                  <Text style={styles.valuePillChevron}>›</Text>
+                </Pressable>
+              ) : pro.resetPreview ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={pro.resetPreview}
+                  style={({ pressed }) => [styles.valuePill, pressed && styles.pressed]}
+                >
+                  <Text style={styles.valuePillLabel}>Reset (dev)</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Habito Pro, see plans"
+            onPress={() => openPaywall('general')}
+            style={({ pressed }) => [styles.settings, styles.proCard, pressed && styles.pressed]}
+          >
+            <View style={styles.settingRow}>
+              <View style={styles.settingText}>
+                <Text style={[styles.settingName, { color: colors.accentText }]}>Habito Pro</Text>
+                <Text style={styles.settingSub}>
+                  {habits.length >= FREE_HABIT_LIMIT
+                    ? `You’re using all ${FREE_HABIT_LIMIT} free habits. Go unlimited, with the year view and every tone.`
+                    : 'Unlimited habits, the year view, every tone and any accent colour.'}
+                </Text>
+              </View>
+              <View style={styles.valuePill}>
+                <Text style={styles.valuePillLabel}>See plans</Text>
+                <Text style={styles.valuePillChevron}>›</Text>
+              </View>
+            </View>
+          </Pressable>
+        )}
+
         <Text style={[text.label, styles.groupLabel]}>
           Badges · {earned} of {badges.length}
         </Text>
@@ -265,7 +322,7 @@ export default function You() {
                 accessibilityLabel={
                   customAccent ? `Custom accent colour ${customAccent}, tap to change` : 'Custom accent colour'
                 }
-                onPress={() => setPickingAccent(true)}
+                onPress={() => (pro.isPro ? setPickingAccent(true) : openPaywall('accent'))}
                 style={[styles.swatch, customAccent !== null && styles.swatchActive]}
               >
                 {customAccent ? (
@@ -614,5 +671,8 @@ const useStyles = themedStyles(({ colors }) => ({
   },
   budget: {
     marginTop: 10,
+  },
+  proCard: {
+    marginTop: 12,
   },
 }));

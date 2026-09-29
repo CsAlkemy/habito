@@ -58,3 +58,71 @@ export function Check({ color, width = 11 }: { color: string; width?: number }) 
     </Svg>
   );
 }
+
+/** Paywall perks — the same 20-unit grid and rounded 1.6 stroke as the tabs. */
+export function InfinityIcon({ color, size = 19 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M10 10c-1.6-2.1-3-3.2-4.6-3.2a3.2 3.2 0 0 0 0 6.4c1.6 0 3-1.1 4.6-3.2s3-3.2 4.6-3.2a3.2 3.2 0 0 1 0 6.4c-1.6 0-3-1.1-4.6-3.2Z"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function TrendIcon({ color, size = 19 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path d="M3 16.5h14" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+      <Path
+        d="M4 12.8 7.6 9.2l2.9 2.6 5-5.2M12.3 6.6h3.2v3.2"
+        stroke={color}
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function BellIcon({ color, size = 19 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M5.4 13.6V9.2a4.6 4.6 0 0 1 9.2 0v4.4l1.4 1.6H4l1.4-1.6Z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Path d="M8.3 17.4a2 2 0 0 0 3.4 0" stroke={color} strokeWidth={1.6} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function DropIcon({ color, size = 19 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Path
+        d="M10 2.8c3 3.4 4.8 6.1 4.8 8.6a4.8 4.8 0 0 1-9.6 0c0-2.5 1.8-5.2 4.8-8.6Z"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+      />
+      <Path d="M7.9 11.8a2.2 2.2 0 0 0 1.7 2" stroke={color} strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+export function WidgetIcon({ color, size = 19 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Rect x={3} y={3} width={6} height={6} rx={2} stroke={color} strokeWidth={1.6} />
+      <Rect x={11} y={3} width={6} height={6} rx={2} stroke={color} strokeWidth={1.6} />
+      <Rect x={3} y={11} width={6} height={6} rx={2} stroke={color} strokeWidth={1.6} />
+      <Rect x={11} y={11} width={6} height={6} rx={2} stroke={color} strokeWidth={1.6} />
+    </Svg>
+  );
+}

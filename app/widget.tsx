@@ -2,10 +2,12 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { NavHeader } from '@/components/NavHeader';
+import { ProTag } from '@/components/ProTag';
 import { RadialBackdrop } from '@/components/RadialBackdrop';
 import { Screen } from '@/components/Screen';
 import { Toggle } from '@/components/Toggle';
 import { WidgetPreview } from '@/components/WidgetPreview';
+import { FREE_WIDGET_STYLES, useOpenPaywall, usePro, WIDGETS_LIVE } from '@/data/pro';
 import { useStore } from '@/data/store';
 import {
   type WidgetConfig,
@@ -33,6 +35,10 @@ export default function WidgetEditor() {
   const { text, colors } = useTheme();
   const styles = useStyles();
   const [draft, setDraft] = useState<WidgetConfig>(widgetConfig);
+  const { isPro } = usePro();
+  const openPaywall = useOpenPaywall();
+  const styleLocked = (style: WidgetConfig['style']) =>
+    WIDGETS_LIVE && !isPro && !FREE_WIDGET_STYLES.includes(style);
 
   const update = (patch: Partial<WidgetConfig>) => setDraft((d) => ({ ...d, ...patch }));
   const capacity = widgetCapacity(draft.style);
@@ -90,13 +96,14 @@ export default function WidgetEditor() {
         <View style={styles.settings}>
           {WIDGET_STYLES.map((option, index) => {
             const selected = option.id === draft.style;
+            const locked = styleLocked(option.id);
             return (
               <Pressable
                 key={option.id}
                 accessibilityRole="radio"
                 accessibilityState={{ selected, checked: selected }}
-                accessibilityLabel={`${option.name}, ${option.sub}`}
-                onPress={() => setStyle(option.id)}
+                accessibilityLabel={`${option.name}, ${option.sub}${locked ? ', Pro' : ''}`}
+                onPress={() => (locked ? openPaywall('widget') : setStyle(option.id))}
                 style={({ pressed }) => [
                   styles.settingRow,
                   index < WIDGET_STYLES.length - 1 && styles.settingDivider,
@@ -107,6 +114,7 @@ export default function WidgetEditor() {
                   <Text style={styles.settingName}>{option.name}</Text>
                   <Text style={styles.settingSub}>{option.sub}</Text>
                 </View>
+                {locked && <ProTag />}
                 <View
                   style={[
                     styles.radio,

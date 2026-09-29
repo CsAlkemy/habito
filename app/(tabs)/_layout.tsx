@@ -1,12 +1,12 @@
 import { BlurTargetView, BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
 import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs';
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { RefObject } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ProgressIcon, TodayIcon, YouIcon } from '@/components/Icons';
+import { useAddHabit } from '@/data/pro';
 import { themedStyles, useTheme } from '@/theme';
 import { alpha } from '@/theme/color';
 import { TAB_BAR_HEIGHT, TAB_BAR_MARGIN } from '@/lib/tabBar';
@@ -139,7 +139,7 @@ function TabFace({ name, focus }: { name: TabName; focus: Animated.Value }) {
  */
 function TabBar({ state, navigation, blurTarget }: BottomTabBarProps & { blurTarget: BlurTarget }) {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const addHabit = useAddHabit();
   const styles = useStyles();
 
   const tabs = state.routes.filter((route) => isTabName(route.name));
@@ -222,7 +222,7 @@ function TabBar({ state, navigation, blurTarget }: BottomTabBarProps & { blurTar
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add a habit"
-            onPress={() => router.push('/habit/new')}
+            onPress={addHabit}
             style={({ pressed }) => [styles.plus, pressed && styles.pressed]}
           >
             <Text style={styles.plusGlyph}>+</Text>

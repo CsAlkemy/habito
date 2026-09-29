@@ -6,6 +6,7 @@ import { LineChart, Sparkline } from '@/components/Charts';
 import { DayHistorySheet } from '@/components/DayHistorySheet';
 import { Heatmap } from '@/components/Heatmap';
 import { Screen } from '@/components/Screen';
+import { FREE_RANGE_WEEKS, useOpenPaywall, usePro } from '@/data/pro';
 import { useAllStats, useHistoryHabits, useStore } from '@/data/store';
 import { completionTrend, heatmapCells } from '@/lib/stats';
 import { useTabBarClearance } from '@/lib/tabBar';
@@ -35,6 +36,8 @@ export default function Progress() {
   const stats = useAllStats();
   const [range, setRange] = useState<(typeof RANGES)[number]>(RANGES[0]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const { isPro } = usePro();
+  const openPaywall = useOpenPaywall();
 
   // Archived habits still count toward the grid — retiring a habit should not
   // rewrite the spring it was part of.
@@ -64,12 +67,15 @@ export default function Progress() {
       <View style={styles.segments}>
         {RANGES.map((option) => {
           const active = option.id === range.id;
+          const locked = !isPro && option.weeks > FREE_RANGE_WEEKS;
           return (
             <Pressable
               key={option.id}
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
+              accessibilityLabel={locked ? `${option.label}, Pro` : undefined}
               onPress={() => {
+                if (locked) return openPaywall('history');
                 setRange(option);
                 setSelectedDay(null);
               }}
@@ -78,6 +84,7 @@ export default function Progress() {
               <Text style={[styles.segmentLabel, active && styles.segmentLabelActive]}>
                 {option.label}
               </Text>
+              {locked && <Text style={styles.segmentPro}>PRO</Text>}
             </Pressable>
           );
         })}
@@ -198,6 +205,17 @@ const useStyles = themedStyles(({ colors }) => ({
     fontFamily: font.semibold,
     letterSpacing: tracking(0.06, 12.5),
     color: colors.accentInk,
+  },
+  /** corner tag on a range that needs Pro */
+  segmentPro: {
+    position: 'absolute' as const,
+    top: 1,
+    right: 4,
+    fontFamily: font.bold,
+    fontSize: 7.5,
+    lineHeight: 9,
+    letterSpacing: tracking(0.1, 7.5),
+    color: colors.accentText,
   },
   body: {
     paddingTop: 14,

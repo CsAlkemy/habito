@@ -5,6 +5,7 @@ import { DashedButton } from '@/components/Button';
 import { HabitRow } from '@/components/HabitRow';
 import { ProgressRing } from '@/components/ProgressRing';
 import { Screen } from '@/components/Screen';
+import { useAddHabit, useAtHabitLimit } from '@/data/pro';
 import { useAllStats, useStore, useTodayProgress } from '@/data/store';
 import type { Habit, HabitStats } from '@/data/types';
 import { greeting, nextMilestone, shortDate } from '@/lib/date';
@@ -35,6 +36,8 @@ export default function Today() {
   const { done, total, ratio } = useTodayProgress();
   const upcoming = upcomingMilestone(habits, stats);
   const clearance = useTabBarClearance();
+  const atLimit = useAtHabitLimit();
+  const addHabit = useAddHabit();
 
   return (
     <Screen bottomExtra={clearance} safeBottom={false}>
@@ -73,7 +76,10 @@ export default function Today() {
             onLongPress={() => router.push(`/skip/${habit.id}`)}
           />
         ))}
-        <DashedButton label="+ Add a habit" onPress={() => router.push('/habit/new')} />
+        <DashedButton
+          label={atLimit ? '+ Add a habit · Pro' : '+ Add a habit'}
+          onPress={addHabit}
+        />
       </ScrollView>
 
       {upcoming && (
